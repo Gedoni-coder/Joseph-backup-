@@ -1,0 +1,2 @@
+- [x] Update backend/chatbot/views.py to use environment variables for API keys
+- [x] Run Django migrations to ensure database is up to date

@@ -1,0 +1,421 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "react-day-picker/dist/style.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    /* Base colors - Professional blue-gray theme */
+    --background: 240 10% 98%;
+    --foreground: 240 10% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 9%;
+
+    /* Professional blue primary */
+    --primary: 217 91% 35%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 217 91% 35%;
+
+    --radius: 0.75rem;
+
+    /* Economic/Financial specific colors */
+    --economic-positive: 142 71% 45%;
+    --economic-positive-foreground: 0 0% 98%;
+    --economic-negative: 0 75% 60%;
+    --economic-negative-foreground: 0 0% 98%;
+    --economic-neutral: 240 4% 46%;
+    --economic-neutral-foreground: 0 0% 98%;
+    --economic-warning: 38 92% 50%;
+    --economic-warning-foreground: 0 0% 98%;
+
+    /* Chart colors */
+    --chart-1: 217 91% 35%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 0 75% 60%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 271 81% 56%;
+
+    /* Sidebar */
+    --sidebar-background: 240 6% 97%;
+    --sidebar-foreground: 240 5% 26%;
+    --sidebar-primary: 240 6% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 240 6% 10%;
+    --sidebar-border: 240 6% 88%;
+    --sidebar-ring: 217 91% 35%;
+  }
+
+  .dark {
+    /* Dark theme - Professional dark blue */
+    --background: 240 10% 4%;
+    --foreground: 240 5% 90%;
+
+    --card: 240 10% 6%;
+    --card-foreground: 240 5% 90%;
+
+    --popover: 240 10% 6%;
+    --popover-foreground: 240 5% 90%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 240 10% 4%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 5% 90%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 64%;
+
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 90%;
+
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 240 5% 90%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 217 91% 60%;
+
+    /* Economic colors for dark mode */
+    --economic-positive: 142 71% 55%;
+    --economic-positive-foreground: 240 10% 4%;
+    --economic-negative: 0 75% 65%;
+    --economic-negative-foreground: 240 10% 4%;
+    --economic-neutral: 240 5% 64%;
+    --economic-neutral-foreground: 240 10% 4%;
+    --economic-warning: 38 92% 60%;
+    --economic-warning-foreground: 240 10% 4%;
+
+    /* Chart colors for dark mode */
+    --chart-1: 217 91% 60%;
+    --chart-2: 142 71% 55%;
+    --chart-3: 0 75% 65%;
+    --chart-4: 38 92% 60%;
+    --chart-5: 271 81% 66%;
+
+    /* Sidebar dark */
+    --sidebar-background: 240 6% 8%;
+    --sidebar-foreground: 240 5% 90%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 240 10% 4%;
+    --sidebar-accent: 240 4% 14%;
+    --sidebar-accent-foreground: 240 5% 90%;
+    --sidebar-border: 240 4% 14%;
+    --sidebar-ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .data-table-row:hover {
+    @apply bg-muted/50;
+  }
+
+  .metric-card {
+    @apply relative overflow-hidden rounded-lg border bg-card p-6 text-card-foreground shadow-sm transition-all hover:shadow-md;
+  }
+
+  .trend-positive {
+    @apply text-economic-positive;
+  }
+
+  .trend-negative {
+    @apply text-economic-negative;
+  }
+
+  .trend-neutral {
+    @apply text-economic-neutral;
+  }
+
+  /* Mobile-first responsive utilities */
+  .responsive-container {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .responsive-padding {
+    @apply p-3 sm:p-4 lg:p-6;
+  }
+
+  .responsive-gap {
+    @apply gap-2 sm:gap-3 lg:gap-4;
+  }
+
+  .responsive-text-sm {
+    @apply text-xs sm:text-sm;
+  }
+
+  .responsive-text-base {
+    @apply text-sm sm:text-base;
+  }
+
+  .responsive-text-lg {
+    @apply text-base sm:text-lg;
+  }
+
+  .responsive-text-xl {
+    @apply text-lg sm:text-xl;
+  }
+
+  .responsive-text-2xl {
+    @apply text-xl sm:text-2xl;
+  }
+
+  .responsive-heading {
+    @apply text-xl sm:text-2xl md:text-3xl font-bold tracking-tight;
+  }
+
+  /* Ensure tables scroll on mobile */
+  .table-container {
+    @apply overflow-x-auto;
+  }
+
+  /* Stack on mobile, row on larger screens */
+  .responsive-stack {
+    @apply flex flex-col sm:flex-row gap-3 sm:gap-4;
+  }
+
+  .responsive-grid-auto {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+  }
+}
+
+/* Calendar styling in Popover */
+[role="dialog"] [role="application"] {
+  @apply w-auto;
+}
+
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: hsl(217, 91%, 35%);
+  --rdp-background-color: hsl(217, 91%, 90%);
+  pointer-events: auto !important;
+}
+
+/* Calendar styling - make fully interactive */
+.rdp-months {
+  position: relative;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+.rdp-month {
+  pointer-events: auto;
+}
+
+.rdp-caption {
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.rdp-nav {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.rdp-nav_button {
+  position: absolute !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 30 !important;
+  touch-action: manipulation;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.rdp-nav_button:hover {
+  opacity: 100% !important;
+  background-color: hsl(217, 91%, 90%) !important;
+}
+
+.rdp-nav_button_previous {
+  left: 8px !important;
+}
+
+.rdp-nav_button_next {
+  right: 8px !important;
+}
+
+.rdp-head_cell {
+  pointer-events: auto;
+  color: hsl(240 4% 46%);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.rdp-cell {
+  pointer-events: auto;
+  position: relative;
+  text-align: center;
+}
+
+.rdp-day {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+  margin: 2px;
+}
+
+.rdp-day button,
+.rdp-day_button {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  min-width: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  background-color: transparent;
+  border: 1px solid transparent;
+  position: relative;
+  z-index: 1;
+}
+
+.rdp-day button:not(:disabled):hover,
+.rdp-day_button:not([disabled]):hover {
+  background-color: hsl(217, 91%, 85%) !important;
+  border-color: hsl(217, 91%, 50%) !important;
+}
+
+.rdp-day button[aria-selected="true"],
+.rdp-day_selected:not([disabled]) button,
+.rdp-day_selected:not([disabled]) {
+  background-color: hsl(217, 91%, 35%) !important;
+  color: white !important;
+  font-weight: 600;
+  border-color: hsl(217, 91%, 35%) !important;
+}
+
+.rdp-day_today {
+  font-weight: 700;
+  color: hsl(217, 91%, 35%);
+}
+
+.rdp-day_disabled,
+.rdp-day button:disabled,
+.rdp-day_disabled button {
+  color: hsl(240 5% 80%) !important;
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  background-color: transparent !important;
+}
+
+/* Popover inside dialogs - ensure it's interactive */
+[role="dialog"] [role="dialog"] {
+  z-index: 60 !important;
+  pointer-events: auto !important;
+}
+
+[role="dialog"] .rdp {
+  z-index: 60 !important;
+  pointer-events: auto !important;
+}
+
+/* Print only the Market Analysis section when exporting */
+@media print {
+  body[data-print-scope="market-analysis"] * {
+    visibility: hidden !important;
+  }
+  body[data-print-scope="market-analysis"] #market-analysis-print,
+  body[data-print-scope="market-analysis"] #market-analysis-print * {
+    visibility: visible !important;
+  }
+  body[data-print-scope="market-analysis"] #market-analysis-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
+
+@layer utilities {
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+  }
+  .animate-pulse-subtle {
+    animation: pulse-subtle 3s ease-in-out infinite;
+  }
+}

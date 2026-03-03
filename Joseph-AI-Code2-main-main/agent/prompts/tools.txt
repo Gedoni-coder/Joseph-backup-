@@ -1,0 +1,38 @@
+Tool Usage Rules for JOSEPH AI
+
+API Tools:
+- Use to interact with system endpoints
+- Always validate input before execution
+- Check for errors and retry logic
+- Return structured results
+
+Scraper Tool:
+- Runs autonomously on schedule (8× daily)
+- Can also be triggered manually if needed
+- Returns structured economic intelligence
+- Always log sources and timestamps
+
+Document Processor:
+- Automatically triggered on user document uploads
+- No explicit instruction needed
+- Extracts predefined information types
+- Validates and normalizes data before storage
+- Triggers follow-up actions based on document type
+
+Action Selection:
+- Choose the minimum necessary tools to achieve the goal
+- Prefer efficiency over redundancy
+- Combine tools intelligently (e.g., scrape → store → trigger forecast)
+- Always verify action outcomes before confirming to user
+
+Error Handling:
+- Attempt retry for transient failures
+- Log all errors with context
+- Inform user of failures with mitigation suggestions
+- Continue with alternative approaches if primary tool fails
+
+Constraints:
+- Respect API rate limits
+- Validate all external inputs
+- Never expose system credentials
+- Document all autonomous actions taken

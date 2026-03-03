@@ -1,0 +1,31 @@
+<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Background -->
+  <rect width="800" height="800" fill="#001a4d"/>
+  
+  <!-- Bird body -->
+  <path d="M 150 450 Q 180 380 220 350 Q 260 320 300 330 Q 320 335 330 360"/>
+  
+  <!-- Bird head -->
+  <circle cx="330" cy="380" r="35"/>
+  
+  <!-- Bird eye -->
+  <circle cx="345" cy="375" r="8" fill="white"/>
+  
+  <!-- Leaf in beak -->
+  <path d="M 320 400 Q 310 410 305 425 Q 310 420 320 415"/>
+  <ellipse cx="298" cy="420" rx="15" ry="25" fill="none" stroke="white" stroke-width="20" transform="rotate(-45 298 420)"/>
+  <path d="M 298 405 Q 290 415 295 430"/>
+  
+  <!-- Upper wing -->
+  <path d="M 330 350 Q 420 300 520 280 Q 550 275 570 300"/>
+  <path d="M 520 280 L 540 320 M 520 280 L 545 310 M 520 280 L 550 295"/>
+  
+  <!-- Lower wing -->
+  <path d="M 330 410 Q 420 440 550 480"/>
+  <path d="M 550 480 L 560 450 M 550 480 L 565 460 M 550 480 L 570 470 M 550 480 L 575 450"/>
+  
+  <!-- Tail feathers -->
+  <path d="M 300 380 L 250 450 L 240 480"/>
+  <path d="M 280 390 L 220 470 L 200 510"/>
+  <path d="M 270 380 L 190 480 L 160 530"/>
+</svg>

@@ -1,0 +1,11 @@
+{
+  "messages": [
+    {
+      "type": "user",
+      "content": "Hello",
+      "context": "economic-forecasting"
+    }
+  ],
+  "context": "economic-forecasting",
+  "currentData": {}
+}
