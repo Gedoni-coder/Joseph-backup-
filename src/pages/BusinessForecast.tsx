@@ -21,10 +21,6 @@ import { DocumentsSection } from "@/components/business/documents-section";
 import { SummaryRecommendationSection } from "@/components/module/summary-recommendation-section";
 import { RevenueTargetsModal, type RevenueTargets } from "@/components/business/revenue-targets-modal";
 import {
-  costStructure as mockCosts,
-  cashFlowForecast as mockCashFlow,
-} from "@/lib/business-forecast-data";
-import {
   BUSINESS_FORECAST_DEFAULTS,
   getSummaryContent,
   SUMMARY_DESCRIPTION,
@@ -69,6 +65,8 @@ const BusinessForecast = () => {
     revenueProjections,
     kpis,
     scenarios,
+    costStructure,
+    cashFlowForecast,
     lastUpdated,
     isLoading,
     error,
@@ -306,10 +304,10 @@ const BusinessForecast = () => {
                             <h4 className="text-sm font-medium text-muted-foreground">
                               Projected Revenue
                             </h4>
-                            <div className="text-3xl font-bold">
+                          <div className="text-3xl font-bold">
                               {formatCurrency(
                                 revenueProjections.reduce(
-                                  (sum, p) => sum + (p.value || 0),
+                                  (sum, p) => sum + (p.projected || 0),
                                   0,
                                 )
                               )}
@@ -327,13 +325,12 @@ const BusinessForecast = () => {
                             <div className="text-3xl font-bold">
                               {(
                                 (revenueProjections.reduce(
-                                  (sum, p) => sum + (p.value || 0),
+                                  (sum, p) => sum + (p.projected || 0),
                                   0,
                                 ) /
                                   revenueTargets.annualRevenue) *
                                 100 || 0
-                              ).toFixed(0)}
-                              %
+                              ).toFixed(0)}%
                             </div>
                             <p className="text-xs text-muted-foreground">
                               On track to goal
@@ -397,7 +394,7 @@ const BusinessForecast = () => {
                     <CardContent>
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
-                          {mockCashFlow.slice(0, 6).map((flow) => (
+{cashFlowForecast.slice(0, 6).map((flow) => (
                             <Card key={flow.id} className="p-3">
                               <div className="space-y-2">
                                 <h4 className="font-medium text-sm">
@@ -456,62 +453,59 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card className="p-4">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">
-                            Gross Profit Margin
-                          </h4>
-                          <div className="text-3xl font-bold text-economic-positive">
-                            {(
-                              revenueProjections.reduce(
-                                (sum, p) => sum + (p.value || 0),
-                                0,
-                              ) * 0.62
-                            ).toFixed(0)}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            After COGS
-                          </p>
-                        </div>
-                      </Card>
-                      <Card className="p-4">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">
-                            Operating Expense
-                          </h4>
-                          <div className="text-3xl font-bold text-economic-negative">
-                            $
-                            {(
-                              revenueProjections.reduce(
-                                (sum, p) => sum + (p.value || 0),
-                                0,
-                              ) * 0.25
-                            ).toFixed(0)}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Annual overhead
-                          </p>
-                        </div>
-                      </Card>
-                      <Card className="p-4">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-muted-foreground">
-                            Net Profit
-                          </h4>
-                          <div className="text-3xl font-bold text-economic-positive">
-                            $
-                            {(
-                              revenueProjections.reduce(
-                                (sum, p) => sum + (p.value || 0),
-                                0,
-                              ) * 0.37
-                            ).toFixed(0)}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Bottom line
-                          </p>
-                        </div>
-                      </Card>
+                      {(() => {
+                        const totalRevenue = revenueProjections.reduce((sum, p) => sum + (p.projected || 0), 0);
+                        const cogsTotal = costStructure.filter(c => c.type === "COGS").reduce((sum, c) => sum + c.amount, 0);
+                        const operatingTotal = costStructure.filter(c => c.type === "Operating").reduce((sum, c) => sum + c.amount, 0);
+                        const grossProfit = totalRevenue - cogsTotal;
+                        const netProfit = grossProfit - operatingTotal;
+                        const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+                        const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+                        
+                        return (
+                          <>
+                            <Card className="p-4">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-muted-foreground">
+                                  Gross Profit
+                                </h4>
+                                <div className="text-3xl font-bold text-economic-positive">
+                                  {formatCurrency(grossProfit)}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {grossMargin.toFixed(1)}% margin (After COGS)
+                                </p>
+                              </div>
+                            </Card>
+                            <Card className="p-4">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-muted-foreground">
+                                  Operating Expense
+                                </h4>
+                                <div className="text-3xl font-bold text-economic-negative">
+                                  {formatCurrency(operatingTotal)}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Annual overhead
+                                </p>
+                              </div>
+                            </Card>
+                            <Card className="p-4">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-muted-foreground">
+                                  Net Profit
+                                </h4>
+                                <div className={`text-3xl font-bold ${netProfit >= 0 ? 'text-economic-positive' : 'text-economic-negative'}`}>
+                                  {formatCurrency(netProfit)}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {netMargin.toFixed(1)}% margin (Bottom line)
+                                </p>
+                              </div>
+                            </Card>
+                          </>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -1473,7 +1467,7 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {mockCosts.map((cost) => (
+{costStructure.map((cost) => (
                         <Card key={cost.id} className="p-4">
                           <div className="space-y-3">
                             <div className="flex items-center justify-between">
@@ -1884,7 +1878,7 @@ const BusinessForecast = () => {
                     <CardContent>
                       <div className="space-y-4">
                         <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
-                          {mockCashFlow.map((flow) => (
+                          {cashFlowForecast.map((flow) => (
                             <Card key={flow.id} className="p-3">
                               <div className="space-y-2">
                                 <h4 className="font-medium text-sm">

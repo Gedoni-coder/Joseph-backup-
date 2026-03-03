@@ -142,8 +142,8 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
     queryset = CustomerProfile.objects.all()
     serializer_class = CustomerProfileSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['segment', 'risk_score']
-    search_fields = ['name', 'email']
+    filterset_fields = ['segment']
+    search_fields = ['segment']
 
 
 class RevenueProjectionViewSet(viewsets.ModelViewSet):
@@ -174,8 +174,8 @@ class KPIViewSet(viewsets.ModelViewSet):
     queryset = KPI.objects.all()
     serializer_class = KPISerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['status']
-    ordering_fields = ['name', 'current_value']
+    filterset_fields = ['category']
+    ordering_fields = ['name', 'current', 'target']
 
 
 class ScenarioPlanningViewSet(viewsets.ModelViewSet):
