@@ -1,82 +1,116 @@
-# Business Forecasting Module - Dynamic Implementation Plan
+# Business Forecasting Dynamic Implementation Plan
 
-## Current State Analysis
+## Information Gathered
 
-### What Currently Uses Hardcoded Data:
-1. **Revenue Targets Modal** - Saved to localStorage only (not synced to API)
-2. **Customer Profiles** - Hardcoded in `business-forecast-data.ts`
-3. **Revenue Projections** - Hardcoded in `business-forecast-data.ts`
-4. **KPIs** - Hardcoded in `business-forecast-data.ts` (50+ KPIs)
-5. **Scenario Planning** - Partially hardcoded
-6. **Cost Structure** - Hardcoded in `business-forecast-data.ts`
-7. **Cash Flow Forecast** - Hardcoded in `business-forecast-data.ts`
-8. **Quick Stats Cards** - Use data from hook but some fallback to defaults
+### Current Architecture
+1. **Django Backend**: Has models for CustomerProfile, RevenueProjection, CostStructure, CashFlowForecast, KPI, ScenarioPlanning - but missing some fields
+2. **API Service Layer**: `src/lib/api/business-forecasting-service.ts` - Has CRUD operations
+3. **React Hook**: `src/hooks/useBusinessForecastingData.ts` - Fetches data with mock fallback
+4. **UI Components**: Located in `src/components/business/` - Uses hardcoded mock data
 
-### Files Involved:
-- `src/pages/BusinessForecast.tsx` - Main page
-- `src/hooks/useBusinessForecastingData.ts` - Data hook
-- `src/lib/api/business-forecasting-service.ts` - API service (already exists)
-- `src/lib/business-forecast-data.ts` - Mock data (needs to be replaced)
-- `src/lib/business-forecast-content.ts` - Static content strings
-- `src/components/business/revenue-targets-modal.tsx` - Modal component
+### Current Data Types (in business-forecast-data.ts)
+- CustomerProfile: id, segment, demandAssumption, growthRate, retention, avgOrderValue, seasonality
+- RevenueProjection: id, period, projected, conservative, optimistic, actualToDate?, confidence
+- KPI: id, name, current, target, unit, trend, category, frequency
+- CashFlowForecast: id, month, cashInflow, cashOutflow, netCashFlow, cumulativeCash, workingCapital
+- ScenarioPlanning: id, scenario, revenue, costs, profit, probability, keyAssumptions
 
----
+### Missing in Django Models
+- RevenueProjection: actualToDate, conservative, optimistic, period display name
+- CustomerProfile: demandAssumption, growthRate, seasonality, revenuePotential
+- KPI: category, frequency, trend
+- CashFlowForecast: month name, cumulativeCash, workingCapital
 
-## Implementation Plan
+## Plan
 
-### Phase 1: API Integration (Priority: HIGH)
-- [ ] Update `useBusinessForecastingData` hook to fetch from Django API
-- [ ] Replace mock data imports with API calls
-- [ ] Add proper loading states and error handling
-- [ ] Implement reconnection logic for failed API calls
+### Phase 1: Django Backend Updates
+1. Extend RevenueProjection model with actualToDate, conservative, optimistic
+2. Extend CustomerProfile with demandAssumption, growthRate, seasonality
+3. Add category/frequency to KPI model
+4. Create serializers
+5. Create viewsets with CRUD
 
-### Phase 2: Revenue Targets (Priority: HIGH)
-- [ ] Save revenue targets to API instead of localStorage only
-- [ ] Load revenue targets from API on page load
-- [ ] Sync modal to work with API
+### Phase 2: TypeScript Calculation Files (Logic Layer)
+Create separate .ts files for each calculation domain:
 
-### Phase 3: Dynamic Data Components (Priority: MEDIUM)
-- [ ] Make Customer Profiles section dynamic from API
-- [ ] Make Revenue Projections section dynamic from API
-- [ ] Make KPIs section dynamic from API
-- [ ] Make Scenario Planning section dynamic from API
-- [ ] Make Cost Structure section dynamic from API
-- [ ] Make Cash Flow Forecast section dynamic from API
+1. **revenue-calculation.ts**
+   - calculateProgress(actual, projected)
+   - calculateVariance(actual, projected)
+   - calculateScenarioRange(conservative, optimistic, projected)
+   - aggregateMonthly/Quarterly/Yearly
 
-### Phase 4: UI Enhancements (Priority: MEDIUM)
-- [ ] Add inline editing for editable fields
-- [ ] Add "Add New" buttons for creating records
-- [ ] Add delete functionality with confirmation
-- [ ] Add export to PDF/Excel options
+2. **kpi-calculation.ts**
+   - calculateProgress(current, target)
+   - determineStatus(progress)
+   - determineTrend(current vs previous)
+   - calculateCategorySummary(kpis)
 
-### Phase 5: Offline Support (Priority: LOW)
-- [ ] Cache API responses
-- [ ] Show cached data when offline
-- [ ] Sync changes when back online
+3. **cashflow-calculation.ts**
+   - calculateNetCashFlow(inflow, outflow)
+   - calculateCumulativeCash(previous, current)
+   - calculateWorkingCapital(inflow, outflow)
 
----
+4. **customer-calculation.ts**
+   - calculateRevenuePotential(demand, avgOrder)
+   - calculateWeightedGrowth(profiles)
+   - calculateOverallRetention(profiles)
+   - calculateTotalMarketOpportunity(profiles)
 
-## API Endpoints Required:
+5. **profitloss-calculation.ts**
+   - calculateGrossProfit(revenue, cogs)
+   - calculateGrossMargin(grossProfit, revenue)
+   - calculateNetProfit(grossProfit, operating)
+   - calculateNetMargin(netProfit, revenue)
 
-```
-GET    /api/business/forecasts/          - List all forecasts
-POST   /api/business/forecasts/           - Create new forecast
-GET    /api/business/forecasts/{id}/     - Get single forecast
-PATCH  /api/business/forecasts/{id}/     - Update forecast
-DELETE /api/business/forecasts/{id}/     - Delete forecast
-```
+6. **alert-generation.ts**
+   - generateRevenueAlerts(projections, targets)
+   - generateCashFlowAlerts(cashFlows)
+   - generateCostAlerts(costStructure)
 
----
+7. **summary-generation.ts**
+   - generateBusinessSummary(data)
+   - generateRecommendations(data)
+   - generateActionItems(data)
+   - generateNextSteps(data)
 
-## Key Changes Summary:
+### Phase 3: Update Hook
+- Import all calculation functions
+- Add computed properties to return object
+- Generate alerts dynamically
+- Generate summaries dynamically
 
-| Component | Current | Target |
-|-----------|---------|--------|
-| Revenue Targets | localStorage | API + localStorage fallback |
-| Customer Profiles | Hardcoded | API |
-| Revenue Projections | Hardcoded | API |
-| KPIs | Hardcoded (50+) | API |
-| Scenarios | Hardcoded | API |
-| Cost Structure | Hardcoded | API |
-| Cash Flow | Hardcoded | API |
-| Data Refresh | Manual button | Auto-refresh + manual |
+### Phase 4: UI Components
+Make all components use computed/dynamic data:
+- RevenueProjections: Dynamic progress bars, variance, confidence
+- KPIDashboard: Dynamic status, progress, summary counts
+- CustomerProfile: Dynamic calculations, demand summary
+- Alerts: Dynamic based on calculations
+- Summary: Dynamic text generation
+
+## Dependent Files to be Edited
+1. `api/models.py` - Add missing fields
+2. `api/serializers.py` - Update serializers
+3. `api/views.py` - Add viewsets
+4. `api/urls/business.py` - Add routes
+5. `src/lib/business-forecast-data.ts` - Update types
+6. `src/lib/api/business-forecasting-service.ts` - Update service
+7. New files in `src/lib/calculations/`:
+   - revenue-calculation.ts
+   - kpi-calculation.ts
+   - cashflow-calculation.ts
+   - customer-calculation.ts
+   - profitloss-calculation.ts
+   - alert-generation.ts
+   - summary-generation.ts
+8. `src/hooks/useBusinessForecastingData.ts` - Update hook
+9. `src/components/business/*.tsx` - Update all components
+10. `src/pages/BusinessForecast.tsx` - Update page
+
+## Followup Steps
+1. Run Django migrations for new fields
+2. Seed initial data via API
+3. Test all endpoints
+4. Verify UI renders with dynamic data
+5. Test progress bar animations
+6. Verify calculations are correct
+

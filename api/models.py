@@ -132,9 +132,11 @@ class CustomerProfile(models.Model):
         ('wholesale', 'Wholesale'),
         ('enterprise', 'Enterprise'),
         ('smb', 'SMB'),
+        ('startup', 'Startup'),
     ]
     RISK_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
     
+    # Basic fields
     name = models.CharField(max_length=200)
     email = models.EmailField()
     segment = models.CharField(max_length=20, choices=SEGMENT_CHOICES)
@@ -143,6 +145,13 @@ class CustomerProfile(models.Model):
     order_frequency = models.IntegerField(default=0)
     risk_score = models.CharField(max_length=20, choices=RISK_CHOICES, default='low')
     preferences = models.JSONField(default=dict)
+    
+    # Extended fields from UI
+    demand_assumption = models.FloatField(default=0, help_text="Demand assumption for segment")
+    growth_rate = models.FloatField(default=0, help_text="Growth rate percentage")
+    retention = models.FloatField(default=0, help_text="Retention rate percentage")
+    seasonality = models.FloatField(default=0, help_text="Seasonality factor")
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -162,6 +171,12 @@ class RevenueProjection(models.Model):
     projected_revenue = models.FloatField()
     confidence = models.IntegerField(default=50)
     assumptions = models.TextField(blank=True)
+    
+    # Extended fields from UI
+    conservative = models.FloatField(default=0, help_text="Conservative revenue projection")
+    optimistic = models.FloatField(default=0, help_text="Optimistic revenue projection")
+    actual_to_date = models.FloatField(default=0, help_text="Actual revenue to date")
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -798,6 +813,234 @@ class LogisticsMetric(models.Model):
 
     def __str__(self):
         return f"{self.name}: {self.value}"
+
+
+# ==================== INVENTORY & SUPPLY CHAIN EXTENDED MODELS ====================
+
+class DemandForecast(models.Model):
+    PERIOD_CHOICES = [('weekly', 'Weekly'), ('monthly', 'Monthly'), ('quarterly', 'Quarterly')]
+    URGENCY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+    
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='demand_forecasts')
+    forecast_period = models.CharField(max_length=20, choices=PERIOD_CHOICES, default='monthly')
+    current_demand = models.IntegerField(default=0)
+    predicted_demand = models.IntegerField(default=0)
+    confidence = models.IntegerField(default=50)
+    seasonal_factor = models.FloatField(default=1.0)
+    trend_factor = models.FloatField(default=1.0)
+    factors = models.JSONField(default=list)
+    reorder_quantity = models.IntegerField(default=0)
+    reorder_timing = models.DateField(null=True, blank=True)
+    reorder_urgency = models.CharField(max_length=20, choices=URGENCY_CHOICES, default='medium')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.item.name} - {self.forecast_period}'
+
+
+class InventoryValuation(models.Model):
+    METHOD_CHOICES = [('FIFO', 'FIFO'), ('LIFO', 'LIFO'), ('WeightedAverage', 'Weighted Average')]
+    
+    method = models.CharField(max_length=20, choices=METHOD_CHOICES, default='FIFO')
+    total_value = models.FloatField(default=0)
+    breakdown = models.JSONField(default=list)
+    variance = models.FloatField(default=0)
+    cost_of_goods_sold = models.FloatField(default=0)
+    calculated_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.method} - {self.total_value}'
+
+
+class DeadStock(models.Model):
+    ACTION_CHOICES = [('markdown', 'Markdown'), ('liquidate', 'Liquidate'), ('donate', 'Donate'), ('dispose', 'Dispose')]
+    
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE)
+    quantity = models.IntegerField(default=0)
+    days_stagnant = models.IntegerField(default=0)
+    original_value = models.FloatField(default=0)
+    current_value = models.FloatField(default=0)
+    depreciation = models.FloatField(default=0)
+    last_movement = models.DateField(null=True, blank=True)
+    recommended_action = models.CharField(max_length=20, choices=ACTION_CHOICES, default='markdown')
+    reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.item.name} - {self.recommended_action}'
+
+
+class InventoryLocation(models.Model):
+    TYPE_CHOICES = [('warehouse', 'Warehouse'), ('store', 'Store'), ('distribution_center', 'Distribution Center'), ('supplier', 'Supplier')]
+    STATUS_CHOICES = [('active', 'Active'), ('inactive', 'Inactive'), ('maintenance', 'Maintenance')]
+    
+    name = models.CharField(max_length=200)
+    location_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    address = models.TextField()
+    capacity = models.IntegerField(default=0)
+    current_utilization = models.IntegerField(default=0)
+    manager = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class InventoryAudit(models.Model):
+    STATUS_CHOICES = [('planned', 'Planned'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('reviewed', 'Reviewed')]
+    
+    audit_date = models.DateField()
+    location = models.ForeignKey(InventoryLocation, on_delete=models.CASCADE)
+    auditor = models.CharField(max_length=100)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
+    total_items_audited = models.IntegerField(default=0)
+    discrepancies = models.JSONField(default=list)
+    accuracy = models.FloatField(default=0)
+    adjustments = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Audit {self.id} - {self.status}'
+
+
+class TurnoverMetrics(models.Model):
+    VELOCITY_CHOICES = [('fast', 'Fast'), ('medium', 'Medium'), ('slow', 'Slow')]
+    
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE)
+    category = models.CharField(max_length=100)
+    turnover_ratio = models.FloatField(default=0)
+    average_inventory = models.FloatField(default=0)
+    cost_of_goods_sold = models.FloatField(default=0)
+    days_of_supply = models.IntegerField(default=0)
+    velocity_rating = models.CharField(max_length=20, choices=VELOCITY_CHOICES, default='medium')
+    recommendation = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.item.name} - {self.turnover_ratio}'
+
+
+class WarehouseOperation(models.Model):
+    warehouse = models.ForeignKey(InventoryLocation, on_delete=models.CASCADE, related_name='operations')
+    layout = models.JSONField(default=dict)
+    efficiency = models.JSONField(default=dict)
+    equipment = models.JSONField(default=list)
+    staffing = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Operation - {self.warehouse.name}'
+
+
+class SupplierContract(models.Model):
+    STATUS_CHOICES = [('active', 'Active'), ('expired', 'Expired'), ('pending', 'Pending'), ('terminated', 'Terminated')]
+    
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='contracts')
+    contract_id = models.CharField(max_length=50)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    value = models.FloatField(default=0)
+    terms = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.supplier.name} - {self.contract_id}'
+
+
+class ProductionPlan(models.Model):
+    STATUS_CHOICES = [('planned', 'Planned'), ('in_progress', 'In Progress'), ('completed', 'Completed'), ('delayed', 'Delayed'), ('cancelled', 'Cancelled')]
+    PRIORITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+    
+    plan_id = models.CharField(max_length=50, unique=True)
+    product_name = models.CharField(max_length=200)
+    planned_quantity = models.IntegerField(default=0)
+    actual_quantity = models.IntegerField(default=0)
+    start_date = models.DateField()
+    end_date = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
+    required_materials = models.JSONField(default=list)
+    bottlenecks = models.JSONField(default=list)
+    efficiency = models.FloatField(default=0)
+    cost_variance = models.FloatField(default=0)
+    production_line = models.CharField(max_length=100, blank=True)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.plan_id} - {self.product_name}'
+
+
+class MarketVolatility(models.Model):
+    TREND_CHOICES = [('increasing', 'Increasing'), ('decreasing', 'Decreasing'), ('stable', 'Stable')]
+    IMPACT_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+    
+    commodity = models.CharField(max_length=200)
+    current_price = models.FloatField(default=0)
+    price_change = models.FloatField(default=0)
+    volatility_index = models.FloatField(default=0)
+    trend = models.CharField(max_length=20, choices=TREND_CHOICES, default='stable')
+    factors = models.JSONField(default=list)
+    impact = models.CharField(max_length=20, choices=IMPACT_CHOICES, default='medium')
+    recommendation = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.commodity} - {self.trend}'
+
+
+class RegulatoryComplianceSC(models.Model):
+    CATEGORY_CHOICES = [('environmental', 'Environmental'), ('safety', 'Safety'), ('trade', 'Trade'), ('quality', 'Quality'), ('labor', 'Labor')]
+    STATUS_CHOICES = [('compliant', 'Compliant'), ('at_risk', 'At Risk'), ('non_compliant', 'Non-Compliant'), ('under_review', 'Under Review')]
+    
+    regulation = models.CharField(max_length=200)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='under_review')
+    last_audit = models.DateField(null=True, blank=True)
+    next_audit = models.DateField(null=True, blank=True)
+    requirements = models.JSONField(default=list)
+    gaps = models.JSONField(default=list)
+    certification_required = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.regulation} - {self.status}'
+
+
+class DisruptionRisk(models.Model):
+    TYPE_CHOICES = [('natural_disaster', 'Natural Disaster'), ('geopolitical', 'Geopolitical'), ('pandemic', 'Pandemic'), ('cyber', 'Cyber'), ('supplier_failure', 'Supplier Failure')]
+    
+    risk_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    description = models.TextField()
+    probability = models.IntegerField(default=0)
+    impact = models.IntegerField(default=0)
+    risk_score = models.FloatField(default=0)
+    affected_suppliers = models.JSONField(default=list)
+    affected_regions = models.JSONField(default=list)
+    mitigation_strategies = models.JSONField(default=list)
+    contingency_plans = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.risk_type} - Score: {self.risk_score}'
+
+
+class SustainabilityMetrics(models.Model):
+    LEVEL_CHOICES = [('bronze', 'Bronze'), ('silver', 'Silver'), ('gold', 'Gold'), ('platinum', 'Platinum')]
+    
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='sustainability')
+    carbon_footprint = models.FloatField(default=0)
+    energy_efficiency = models.FloatField(default=0)
+    waste_reduction = models.FloatField(default=0)
+    sustainability_score = models.FloatField(default=0)
+    certifications = models.JSONField(default=list)
+    green_initiatives = models.JSONField(default=list)
+    compliance_level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default='bronze')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.supplier.name} - {self.compliance_level}'
 
 
 # ==================== CHATBOT MODELS ====================

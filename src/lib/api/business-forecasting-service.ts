@@ -19,12 +19,17 @@ export interface CustomerProfile {
   id: number;
   name: string;
   email: string;
-  segment: 'retail' | 'wholesale' | 'enterprise' | 'smb';
+  segment: 'retail' | 'wholesale' | 'enterprise' | 'smb' | 'startup';
   lifetime_value: number;
   average_order_value: number;
   order_frequency: number;
   risk_score: 'low' | 'medium' | 'high';
   preferences: Record<string, unknown>;
+  // Extended fields from UI
+  demand_assumption: number;
+  growth_rate: number;
+  retention: number;
+  seasonality: number;
   created_at: string;
 }
 
@@ -74,6 +79,10 @@ export interface RevenueProjection {
   projected_revenue: number;
   confidence: number;
   assumptions: string;
+  // Extended fields from UI
+  conservative: number;
+  optimistic: number;
+  actual_to_date: number;
   created_at: string;
 }
 

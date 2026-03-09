@@ -5,8 +5,22 @@ import { Button } from "@/components/ui/button";
 import { RevenueProjection } from "@/lib/business-forecast-data";
 import { TrendingUp, Target, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCurrency } from "@/lib/currency-context";
+// Import calculation functions
+import {
+  calculateProgress,
+  calculateVariance,
+  getVarianceColor,
+  getConfidenceLevel,
+  getConfidenceColor,
+  calculateScenarioRangePosition,
+  calculateTotalProjectedRevenue,
+  calculateAverageConfidence,
+  calculatePotentialUpside,
+  generateMonthlyProjections,
+  generateYearlyProjection,
+} from "@/lib/calculations/revenue-calculation";
 
 interface RevenueProjectionsProps {
   projections: RevenueProjection[];
@@ -22,104 +36,47 @@ export function RevenueProjections({
   const [viewType, setViewType] = useState<ViewType>("quarterly");
   const { formatCurrency } = useCurrency();
 
-  const getVarianceColor = (actual?: number, projected?: number) => {
-    if (!actual || !projected) return "text-muted-foreground";
-    const variance = ((actual - projected) / projected) * 100;
-    if (variance > 5) return "text-economic-positive";
-    if (variance < -5) return "text-economic-negative";
-    return "text-economic-neutral";
-  };
-
-  const getVariancePercentage = (actual?: number, projected?: number) => {
-    if (!actual || !projected) return null;
-    return ((actual - projected) / projected) * 100;
-  };
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return "text-economic-positive";
-    if (confidence >= 60) return "text-economic-warning";
-    return "text-economic-negative";
-  };
-
-  const totalProjectedRevenue = projections.reduce(
-    (sum, p) => sum + p.projected,
-    0,
+  // Memoized calculations
+  const totalProjectedRevenue = useMemo(
+    () => calculateTotalProjectedRevenue(projections),
+    [projections]
   );
 
-  // Generate monthly data from quarterly projections
-  const generateMonthlyData = (): RevenueProjection[] => {
-    const monthlyData: RevenueProjection[] = [];
-    const months = [
-      "Jan 2025",
-      "Feb 2025",
-      "Mar 2025",
-      "Apr 2025",
-      "May 2025",
-      "Jun 2025",
-      "Jul 2025",
-      "Aug 2025",
-      "Sep 2025",
-      "Oct 2025",
-      "Nov 2025",
-      "Dec 2025",
-    ];
+  const averageConfidence = useMemo(
+    () => calculateAverageConfidence(projections),
+    [projections]
+  );
 
-    const quarterly = projections.slice(0, 4);
+  const potentialUpside = useMemo(
+    () => calculatePotentialUpside(projections),
+    [projections]
+  );
 
-    for (let i = 0; i < 12; i++) {
-      const quarterIndex = Math.floor(i / 3);
-      const q = quarterly[quarterIndex];
-
-      if (q) {
-        const monthlyProjected = q.projected / 3;
-        const monthlyConservative = q.conservative / 3;
-        const monthlyOptimistic = q.optimistic / 3;
-        const monthlyActual = q.actualToDate ? q.actualToDate / 3 : undefined;
-
-        monthlyData.push({
-          id: `month-${i + 1}`,
-          period: months[i],
-          projected: monthlyProjected,
-          conservative: monthlyConservative,
-          optimistic: monthlyOptimistic,
-          actualToDate: monthlyActual,
-          confidence: q.confidence,
-        });
-      }
+  // Generate view data based on view type
+  const displayData = useMemo(() => {
+    if (viewType === "monthly") {
+      return generateMonthlyProjections(projections);
     }
-
-    return monthlyData;
-  };
-
-  // Generate yearly data
-  const generateYearlyData = (): RevenueProjection[] => {
-    return [
-      {
-        id: "yearly-2025",
-        period: "Full Year 2025",
-        projected: totalProjectedRevenue,
-        conservative: projections.reduce((sum, p) => sum + p.conservative, 0),
-        optimistic: projections.reduce((sum, p) => sum + p.optimistic, 0),
-        actualToDate: projections.reduce(
-          (sum, p) => sum + (p.actualToDate || 0),
-          0,
-        ),
-        confidence: Math.round(
-          projections.reduce((sum, p) => sum + p.confidence, 0) /
-            projections.length,
-        ),
-      },
-    ];
-  };
-
-  const getDisplayData = (): RevenueProjection[] => {
-    if (viewType === "monthly") return generateMonthlyData();
-    if (viewType === "yearly") return generateYearlyData();
+    if (viewType === "yearly") {
+      return [generateYearlyProjection(projections)];
+    }
     return projections;
+  }, [projections, viewType]);
+
+  const displayTotal = useMemo(
+    () => displayData.reduce((sum, p) => sum + p.projected, 0),
+    [displayData]
+  );
+
+  // Calculate variance for display
+  const getVariance = (actual?: number, projected?: number) => {
+    return calculateVariance(actual, projected);
   };
 
-  const displayData = getDisplayData();
-  const displayTotal = displayData.reduce((sum, p) => sum + p.projected, 0);
+  // Calculate progress for display
+  const getProgress = (actual?: number, projected?: number) => {
+    return calculateProgress(actual, projected);
+  };
 
   return (
     <div className="space-y-6">
@@ -172,9 +129,12 @@ export function RevenueProjections({
         )}
       >
         {displayData.map((projection) => {
-          const variance = getVariancePercentage(
-            projection.actualToDate,
+          const variance = getVariance(projection.actualToDate, projection.projected);
+          const progress = getProgress(projection.actualToDate, projection.projected);
+          const scenarioRangePosition = calculateScenarioRangePosition(
             projection.projected,
+            projection.conservative,
+            projection.optimistic
           );
 
           return (
@@ -228,10 +188,7 @@ export function RevenueProjections({
                         <span
                           className={cn(
                             "font-medium",
-                            getVarianceColor(
-                              projection.actualToDate,
-                              projection.projected,
-                            ),
+                            getVarianceColor(variance),
                           )}
                         >
                           {variance !== null && (
@@ -253,21 +210,13 @@ export function RevenueProjections({
                             Progress
                           </span>
                           <span className="font-bold text-primary">
-                            {Math.round(
-                              (projection.actualToDate / projection.projected) *
-                                100,
-                            )}
-                            %
+                            {progress}%
                           </span>
                         </div>
                         <div className="flex gap-1 h-12 items-end">
                           {[...Array(10)].map((_, i) => {
-                            const progressPercentage =
-                              (projection.actualToDate / projection.projected) *
-                              100;
                             const segmentThreshold = (i + 1) * 10;
-                            const isFilled =
-                              progressPercentage >= segmentThreshold;
+                            const isFilled = progress >= segmentThreshold;
 
                             return (
                               <div
@@ -300,11 +249,7 @@ export function RevenueProjections({
                     </div>
                     <div className="relative">
                       <Progress
-                        value={
-                          ((projection.projected - projection.conservative) /
-                            (projection.optimistic - projection.conservative)) *
-                          100
-                        }
+                        value={scenarioRangePosition}
                         className="h-2"
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -319,11 +264,7 @@ export function RevenueProjections({
                       <span
                         className={getConfidenceColor(projection.confidence)}
                       >
-                        {projection.confidence >= 80
-                          ? "High"
-                          : projection.confidence >= 60
-                            ? "Medium"
-                            : "Low"}
+                        {getConfidenceLevel(projection.confidence)}
                       </span>
                     </div>
                     <Progress
@@ -369,11 +310,7 @@ export function RevenueProjections({
                   Avg Confidence
                 </div>
                 <div className="text-lg font-bold">
-                  {(
-                    displayData.reduce((sum, p) => sum + p.confidence, 0) /
-                    displayData.length
-                  ).toFixed(0)}
-                  %
+                  {averageConfidence}%
                 </div>
               </div>
             </div>
@@ -391,10 +328,7 @@ export function RevenueProjections({
                   Potential Upside
                 </div>
                 <div className="text-lg font-bold">
-                  {formatCurrency(
-                    displayData.reduce((sum, p) => sum + p.optimistic, 0) -
-                      displayTotal,
-                  )}
+                  {formatCurrency(potentialUpside)}
                 </div>
               </div>
             </div>
@@ -404,3 +338,4 @@ export function RevenueProjections({
     </div>
   );
 }
+

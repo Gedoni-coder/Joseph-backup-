@@ -46,16 +46,68 @@ import {
   CashFlowForecast,
 } from "@/lib/business-forecast-data";
 
+// Import calculation functions
+import {
+  // Revenue calculations
+  calculateProgress,
+  calculateVariance,
+  calculateTotalProjectedRevenue,
+  calculateTotalActualToDate,
+  calculateAverageConfidence,
+  calculatePotentialUpside,
+  calculateAchievement,
+  getConfidenceLevel,
+  getConfidenceColor,
+  // KPI calculations
+  calculateKPIProgress,
+  determineKPIStatus,
+  determineSimpleStatus,
+  calculateKPISummary,
+  groupKPIsByCategory,
+  // Customer calculations
+  calculateTotalMarketOpportunity,
+  calculateWeightedAvgGrowth,
+  calculateOverallRetention,
+  calculateRevenuePotential,
+  // Alert generation
+  generateAllAlerts,
+  generateRevenueAlerts,
+  generateCashFlowAlerts,
+  generateKPIAlerts,
+  type Alert,
+  // Summary generation
+  generateBusinessSummary,
+  generateRecommendations,
+  generateSummaryMetrics,
+  generateActionItems,
+  generateNextSteps,
+  generateDemandSummary,
+  type SummaryMetrics,
+  type ActionItem,
+  type NextStep,
+} from "@/lib/calculations";
+
+// Import profit/loss calculations
+import {
+  calculateProfitProjection,
+  calculateGrossProfit,
+  calculateNetProfit,
+  calculateGrossMargin,
+  calculateNetMargin,
+  calculateTotalCOGS,
+  calculateTotalOperatingExpenses,
+} from "@/lib/calculations/profitloss-calculation";
+
 // Transform API CustomerProfile to UI format
 function transformCustomerProfile(apiProfile: ApiCustomerProfile): CustomerProfile {
   return {
     id: String(apiProfile.id),
     segment: apiProfile.segment.charAt(0).toUpperCase() + apiProfile.segment.slice(1),
-    demandAssumption: apiProfile.lifetime_value / 10000, // Approximate
-    growthRate: apiProfile.order_frequency * 5, // Approximate
-    retention: 85 - (apiProfile.risk_score === 'high' ? 20 : apiProfile.risk_score === 'medium' ? 10 : 0),
+    demandAssumption: apiProfile.demand_assumption || apiProfile.lifetime_value / 10000,
+    growthRate: apiProfile.growth_rate || apiProfile.order_frequency * 5,
+    retention: apiProfile.retention || (85 - (apiProfile.risk_score === 'high' ? 20 : apiProfile.risk_score === 'medium' ? 10 : 0)),
     avgOrderValue: apiProfile.average_order_value,
-    seasonality: 10,
+    seasonality: apiProfile.seasonality || 10,
   };
 }
 
@@ -71,8 +123,9 @@ function transformRevenueProjection(apiProjection: ApiRevenueProjection): Revenu
     id: String(apiProjection.id),
     period: periodMap[apiProjection.period] || apiProjection.period,
     projected: apiProjection.projected_revenue,
-    conservative: apiProjection.projected_revenue * 0.8,
-    optimistic: apiProjection.projected_revenue * 1.2,
+    conservative: apiProjection.conservative || apiProjection.projected_revenue * 0.8,
+    optimistic: apiProjection.optimistic || apiProjection.projected_revenue * 1.2,
+    actualToDate: apiProjection.actual_to_date,
     confidence: apiProjection.confidence,
   };
 }
@@ -388,6 +441,53 @@ export function useBusinessForecastingData() {
     },
   });
 
+  // ==================== COMPUTED CALCULATIONS ====================
+  
+  // Revenue calculations
+  const totalProjectedRevenue = calculateTotalProjectedRevenue(revenueProjections);
+  const totalActualToDate = calculateTotalActualToDate(revenueProjections);
+  const averageConfidence = calculateAverageConfidence(revenueProjections);
+  const potentialUpside = calculatePotentialUpside(revenueProjections);
+  
+  // KPI calculations
+  const kpiSummary = calculateKPISummary(kpis);
+  const kpisByCategory = groupKPIsByCategory(kpis);
+  
+  // Customer calculations
+  const totalMarketOpportunity = calculateTotalMarketOpportunity(customerProfiles);
+  const weightedAvgGrowth = calculateWeightedAvgGrowth(customerProfiles);
+  const overallRetention = calculateOverallRetention(customerProfiles);
+  
+  // Profit/Loss calculations
+  const profitProjection = calculateProfitProjection(revenueProjections, costStructure);
+  
+  // Generate alerts
+  const alerts = generateAllAlerts(
+    revenueProjections,
+    cashFlowForecast,
+    costStructure,
+    kpis
+  );
+  
+  // Summary generation (requires annualTarget - will be passed externally)
+  const getSummaryMetrics = (annualTarget?: number) => 
+    generateSummaryMetrics(revenueProjections, customerProfiles, scenarios, kpis, annualTarget);
+  
+  const getBusinessSummary = (annualTarget?: number) => 
+    generateBusinessSummary(revenueProjections, customerProfiles, scenarios, kpis, annualTarget);
+  
+  const getRecommendations = () => 
+    generateRecommendations(revenueProjections, customerProfiles, kpis, costStructure);
+  
+  const getActionItems = () => 
+    generateActionItems(revenueProjections, kpis, cashFlowForecast);
+  
+  const getNextSteps = () => 
+    generateNextSteps(revenueProjections, kpis);
+  
+  const getDemandSummary = () => 
+    generateDemandSummary(customerProfiles);
+
   return {
     // Data
     customerProfiles,
@@ -403,9 +503,48 @@ export function useBusinessForecastingData() {
     error,
     isConnected,
     
+    // Computed Revenue Data
+    totalProjectedRevenue,
+    totalActualToDate,
+    averageConfidence,
+    potentialUpside,
+    
+    // Computed KPI Data
+    kpiSummary,
+    kpisByCategory,
+    
+    // Computed Customer Data
+    totalMarketOpportunity,
+    weightedAvgGrowth,
+    overallRetention,
+    
+    // Computed Profit/Loss Data
+    profitProjection,
+    
+    // Generated Alerts
+    alerts,
+    
+    // Summary Generators
+    getSummaryMetrics,
+    getBusinessSummary,
+    getRecommendations,
+    getActionItems,
+    getNextSteps,
+    getDemandSummary,
+    
     // Actions
     refreshData,
     reconnect: refreshData,
+    
+    // Calculation utilities (exposed for use in components)
+    calculateProgress,
+    calculateVariance,
+    calculateKPIProgress,
+    determineKPIStatus,
+    determineSimpleStatus,
+    calculateRevenuePotential,
+    getConfidenceLevel,
+    getConfidenceColor,
     
     // Update functions (for backward compatibility)
     updateKPI: async (id: string, newValue: number) => {
@@ -430,22 +569,27 @@ export function useBusinessForecastingData() {
     },
     
     // CRUD operations for each entity type
-    // Customer Profiles
+// Customer Profiles
     addCustomerProfile: (data: Partial<CustomerProfile>) => {
       return createCustomerProfileMutation.mutateAsync({
         name: data.segment,
         email: 'info@example.com',
-        segment: data.segment?.toLowerCase() as 'enterprise' | 'smb' | 'retail' | 'wholesale',
-        lifetime_value: data.demandAssumption || 0,
+        segment: data.segment?.toLowerCase() as 'enterprise' | 'smb' | 'retail' | 'wholesale' | 'startup',
+        lifetime_value: data.demandAssumption ? data.demandAssumption * 10000 : 0,
         average_order_value: data.avgOrderValue || 0,
         order_frequency: Math.round((data.growthRate || 0) / 5),
         risk_score: data.retention && data.retention > 80 ? 'low' : 
                     data.retention && data.retention > 60 ? 'medium' : 'high',
         preferences: {},
+        // Extended fields
+        demand_assumption: data.demandAssumption || 0,
+        growth_rate: data.growthRate || 0,
+        retention: data.retention || 0,
+        seasonality: data.seasonality || 0,
       });
     },
     
-    // Revenue Projections
+// Revenue Projections
     addRevenueProjection: (data: Partial<RevenueProjection>) => {
       return createRevenueProjectionMutation.mutateAsync({
         name: data.period || 'New Projection',
@@ -453,6 +597,10 @@ export function useBusinessForecastingData() {
         projected_revenue: data.projected || 0,
         confidence: data.confidence || 75,
         assumptions: '',
+        // Extended fields
+        conservative: data.conservative || data.projected * 0.8 || 0,
+        optimistic: data.optimistic || data.projected * 1.2 || 0,
+        actual_to_date: data.actualToDate || 0,
       });
     },
     
