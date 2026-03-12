@@ -6,13 +6,13 @@ from ..views import (
 )
 
 router = DefaultRouter()
-router.register(r'customer-profiles', CustomerProfileViewSet)
-router.register(r'revenue-projections', RevenueProjectionViewSet)
-router.register(r'cost-structures', CostStructureViewSet)
-router.register(r'cash-flow-forecasts', CashFlowForecastViewSet)
-router.register(r'kpis', KPIViewSet)
-router.register(r'scenario-plannings', ScenarioPlanningViewSet)
-router.register(r'documents', DocumentViewSet)
+router.register(r'customer-profiles', CustomerProfileViewSet, basename='customerprofile')
+router.register(r'revenue-projections', RevenueProjectionViewSet, basename='revenueprojection')
+router.register(r'cost-structures', CostStructureViewSet, basename='coststructure')
+router.register(r'cash-flow-forecasts', CashFlowForecastViewSet, basename='cashflowforecast')
+router.register(r'kpis', KPIViewSet, basename='kpi')
+router.register(r'scenario-plannings', ScenarioPlanningViewSet, basename='scenarioplanning')
+router.register(r'documents', DocumentViewSet, basename='document')
 
 urlpatterns = [
     path('', include(router.urls)),

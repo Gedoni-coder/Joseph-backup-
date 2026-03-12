@@ -22,7 +22,8 @@ from .models import (
     # Pricing
     PriceSetting, PricingRule, PriceForecast,
     # Tax
-    TaxRecord, ComplianceReport,
+    TaxRecord, TaxRecommendation, ComplianceUpdate, TaxPlanningScenario,
+    TaxAuditEvent, ComplianceObligation, ComplianceReport,
     # Policy
     ExternalPolicy, InternalPolicy, StrategyRecommendation,
     # Inventory
@@ -38,21 +39,7 @@ class CompanyProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyProfile
         fields = '__all__'
-        read_only_fields = ('created_at', 'updated_at')
-
-    def create(self, validated_data):
-        # Get the user from the request context if available
-        user = None
-        if self.context.get('request'):
-            user = self.context['request'].user
-            if user.is_authenticated:
-                validated_data['user'] = user
-        
-        # If user is already in validated_data (from ViewSet), use that
-        if 'user' not in validated_data:
-            validated_data['user'] = user
-            
-        return super().create(validated_data)
+        read_only_fields = ('created_at', 'updated_at', 'user')
 
 
 class CompanyProfileListSerializer(serializers.ModelSerializer):
@@ -101,36 +88,42 @@ class CustomerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerProfile
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class RevenueProjectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = RevenueProjection
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class CostStructureSerializer(serializers.ModelSerializer):
     class Meta:
         model = CostStructure
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class CashFlowForecastSerializer(serializers.ModelSerializer):
     class Meta:
         model = CashFlowForecast
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class KPISerializer(serializers.ModelSerializer):
     class Meta:
         model = KPI
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class ScenarioPlanningSerializer(serializers.ModelSerializer):
     class Meta:
         model = ScenarioPlanning
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -300,12 +293,49 @@ class TaxRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaxRecord
         fields = '__all__'
+        read_only_fields = ('user',)
+
+
+class TaxRecommendationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaxRecommendation
+        fields = '__all__'
+        read_only_fields = ('user',)
+
+
+class ComplianceUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ComplianceUpdate
+        fields = '__all__'
+        read_only_fields = ('user',)
+
+
+class TaxPlanningScenarioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaxPlanningScenario
+        fields = '__all__'
+        read_only_fields = ('user',)
+
+
+class TaxAuditEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TaxAuditEvent
+        fields = '__all__'
+        read_only_fields = ('user',)
+
+
+class ComplianceObligationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ComplianceObligation
+        fields = '__all__'
+        read_only_fields = ('user',)
 
 
 class ComplianceReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = ComplianceReport
         fields = '__all__'
+        read_only_fields = ('user',)
 
 
 # ==================== POLICY SERIALIZERS ====================

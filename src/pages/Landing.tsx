@@ -33,11 +33,11 @@ import {
 
 const Landing = () => {
   const navigateRef = React.useRef<any>(null);
-  // Inline lazy check to gate Landing behind SignUp once per browser
+  // Gate Landing behind a valid auth token
   React.useEffect(() => {
     try {
-      const done = localStorage.getItem("joseph:signedUp");
-      if (!done) {
+      const token = localStorage.getItem("authToken");
+      if (!token) {
         // Defer navigation to avoid interfering with first render
         navigateRef.current = setTimeout(() => {
           window.location.replace("/signup");

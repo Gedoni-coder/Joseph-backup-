@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,33 +17,17 @@ import {
   Zap,
   Filter,
 } from "lucide-react";
-
-interface ComplianceObligation {
-  id: string;
-  name: string;
-  description: string;
-  dueDate: Date;
-  frequency: "monthly" | "quarterly" | "annually" | "event-based";
-  agency: string;
-  jurisdiction: string;
-  consequence: "low" | "medium" | "high" | "critical";
-  consequence_detail: string;
-  status: "completed" | "pending" | "at-risk" | "overdue";
-  assignedTo: string;
-  dependencies: string[];
-  documentationRequired: string[];
-  priority: "low" | "medium" | "high" | "critical";
-}
+import type { ComplianceObligation } from "@/lib/tax-compliance-data";
 
 interface DependencyAlert {
-  obligationId: string;
+  obligationId: number;
   missingDependencies: string[];
   riskLevel: "low" | "medium" | "high" | "critical";
 }
 
 interface Alert {
   id: string;
-  obligationId: string;
+  obligationId: number;
   type: "early-warning" | "upcoming" | "urgent" | "dependency" | "overdue";
   message: string;
   daysUntilDue: number;
@@ -57,259 +41,68 @@ interface TodoItem {
   task: string;
   description: string;
   completed: boolean;
-  obligationId: string;
+  obligationId: number;
   obligationName: string;
   priority: "low" | "medium" | "high" | "critical";
-  dueDate: Date;
+  dueDate: string | null;
 }
 
-export function ComplianceCalendar() {
-  const [obligations, setObligations] = useState<ComplianceObligation[]>([
-    {
-      id: "vat-001",
-      name: "VAT Return Filing",
-      description: "Monthly VAT return and payment submission",
-      dueDate: new Date(2025, 0, 15),
-      frequency: "monthly",
-      agency: "Tax Authority",
-      jurisdiction: "National",
-      consequence: "high",
-      consequence_detail:
-        "Interest accrual, penalties up to 10% of unpaid amount",
-      status: "pending",
-      assignedTo: "Finance Manager",
-      dependencies: ["invoice-reconciliation", "bank-reconciliation"],
-      documentationRequired: [
-        "Sales Invoices",
-        "Purchase Invoices",
-        "Bank Statements",
-      ],
-      priority: "high",
-    },
-    {
-      id: "paye-001",
-      name: "PAYE / Payroll Remittance",
-      description: "Monthly employee tax and social contribution withholdings",
-      dueDate: new Date(2025, 0, 10),
-      frequency: "monthly",
-      agency: "Labor Authority",
-      jurisdiction: "National",
-      consequence: "critical",
-      consequence_detail:
-        "Personal liability of officers, criminal penalties, employee claims",
-      status: "pending",
-      assignedTo: "HR Manager",
-      dependencies: ["payroll-processing", "employee-verification"],
-      documentationRequired: [
-        "Payroll Register",
-        "Employee Information",
-        "Deduction Records",
-      ],
-      priority: "critical",
-    },
-    {
-      id: "corporate-tax-001",
-      name: "Corporate Income Tax Filing",
-      description: "Annual corporate income tax return",
-      dueDate: new Date(2025, 3, 30),
-      frequency: "annually",
-      agency: "Revenue Authority",
-      jurisdiction: "National",
-      consequence: "high",
-      consequence_detail: "Audit triggers, penalties, interest on late payment",
-      status: "pending",
-      assignedTo: "Chief Financial Officer",
-      dependencies: [
-        "financial-statements",
-        "balance-sheet",
-        "income-statement",
-      ],
-      documentationRequired: [
-        "Audited Financial Statements",
-        "Supporting Schedules",
-        "Asset Register",
-      ],
-      priority: "high",
-    },
-    {
-      id: "withholding-001",
-      name: "Withholding Tax Filing",
-      description: "Quarterly withholding tax on contractor payments",
-      dueDate: new Date(2025, 0, 20),
-      frequency: "quarterly",
-      agency: "Tax Authority",
-      jurisdiction: "National",
-      consequence: "medium",
-      consequence_detail: "Interest charges, administrative penalties",
-      status: "at-risk",
-      assignedTo: "Finance Manager",
-      dependencies: ["invoice-processing", "contractor-verification"],
-      documentationRequired: ["Contractor Invoices", "Payment Records"],
-      priority: "medium",
-    },
-    {
-      id: "license-renewal-001",
-      name: "Business License Renewal",
-      description: "Annual business operating license renewal",
-      dueDate: new Date(2025, 5, 30),
-      frequency: "annually",
-      agency: "Business Registration Authority",
-      jurisdiction: "Local",
-      consequence: "high",
-      consequence_detail: "Suspension of business operations, legal penalties",
-      status: "pending",
-      assignedTo: "Legal Compliance Officer",
-      dependencies: [],
-      documentationRequired: [
-        "Previous License",
-        "Identity Verification",
-        "Address Proof",
-      ],
-      priority: "high",
-    },
-    {
-      id: "audit-001",
-      name: "Annual Audit Submission",
-      description: "Auditor report and financial audit submission",
-      dueDate: new Date(2025, 4, 31),
-      frequency: "annually",
-      agency: "Regulatory Authority",
-      jurisdiction: "National",
-      consequence: "medium",
-      consequence_detail:
-        "Regulatory scrutiny, compliance certification delays",
-      status: "overdue",
-      assignedTo: "Chief Financial Officer",
-      dependencies: ["financial-statements", "internal-controls"],
-      documentationRequired: [
-        "Audit Report",
-        "Management Letter",
-        "Financial Statements",
-      ],
-      priority: "critical",
-    },
-  ]);
+interface ComplianceCalendarProps {
+  obligations: ComplianceObligation[];
+}
 
+export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
   const [selectedObligation, setSelectedObligation] =
     useState<ComplianceObligation | null>(null);
   const [filter, setFilter] = useState<
-    "all" | "pending" | "at-risk" | "overdue"
+    "all" | "pending" | "at_risk" | "overdue"
   >("all");
-  const [alerts, setAlerts] = useState<Alert[]>([
-    {
-      id: "alert-1",
-      obligationId: "vat-001",
-      type: "dependency",
-      message: "Invoice reconciliation not completed. VAT filing at risk.",
-      daysUntilDue: 3,
-      role: "Finance Manager",
-      read: false,
-      createdAt: new Date(),
-    },
-    {
-      id: "alert-2",
-      obligationId: "paye-001",
-      type: "upcoming",
-      message: "PAYE remittance due in 5 days",
-      daysUntilDue: 5,
-      role: "HR Manager",
-      read: false,
-      createdAt: new Date(),
-    },
-    {
-      id: "alert-3",
-      obligationId: "audit-001",
-      type: "overdue",
-      message: "Annual audit submission is 10 days overdue",
-      daysUntilDue: -10,
-      role: "Chief Financial Officer",
-      read: false,
-      createdAt: new Date(),
-    },
-  ]);
 
-  const [todoItems, setTodoItems] = useState<TodoItem[]>([
-    {
-      id: "todo-1",
-      task: "Invoice Reconciliation",
-      description: "Reconcile all sales and purchase invoices for the month",
-      completed: false,
-      obligationId: "vat-001",
-      obligationName: "VAT Return Filing",
-      priority: "high",
-      dueDate: new Date(2025, 0, 10),
-    },
-    {
-      id: "todo-2",
-      task: "Bank Reconciliation",
-      description: "Reconcile bank statements with general ledger",
-      completed: false,
-      obligationId: "vat-001",
-      obligationName: "VAT Return Filing",
-      priority: "high",
-      dueDate: new Date(2025, 0, 10),
-    },
-    {
-      id: "todo-3",
-      task: "Payroll Processing",
-      description: "Process monthly payroll and calculate withholdings",
-      completed: false,
-      obligationId: "paye-001",
-      obligationName: "PAYE / Payroll Remittance",
-      priority: "critical",
-      dueDate: new Date(2025, 0, 8),
-    },
-    {
-      id: "todo-4",
-      task: "Employee Verification",
-      description: "Verify employee information and deduction records",
-      completed: true,
-      obligationId: "paye-001",
-      obligationName: "PAYE / Payroll Remittance",
-      priority: "critical",
-      dueDate: new Date(2025, 0, 5),
-    },
-    {
-      id: "todo-5",
-      task: "Financial Statements Preparation",
-      description: "Prepare audited financial statements and supporting schedules",
-      completed: false,
-      obligationId: "corporate-tax-001",
-      obligationName: "Corporate Income Tax Filing",
-      priority: "high",
-      dueDate: new Date(2025, 3, 20),
-    },
-    {
-      id: "todo-6",
-      task: "Balance Sheet Review",
-      description: "Review and finalize balance sheet with audit adjustments",
-      completed: false,
-      obligationId: "corporate-tax-001",
-      obligationName: "Corporate Income Tax Filing",
-      priority: "high",
-      dueDate: new Date(2025, 3, 20),
-    },
-    {
-      id: "todo-7",
-      task: "Contractor Invoice Processing",
-      description: "Process and verify all contractor invoices",
-      completed: false,
-      obligationId: "withholding-001",
-      obligationName: "Withholding Tax Filing",
-      priority: "medium",
-      dueDate: new Date(2025, 0, 15),
-    },
-    {
-      id: "todo-8",
-      task: "Audit Report Collection",
-      description: "Obtain final audit report and management letter",
-      completed: false,
-      obligationId: "audit-001",
-      obligationName: "Annual Audit Submission",
-      priority: "critical",
-      dueDate: new Date(2025, 4, 15),
-    },
-  ]);
+  // Derive alerts from obligations
+  const alerts = useMemo<Alert[]>(() => {
+    const now = new Date();
+    return obligations
+      .filter((o) => o.status !== "completed")
+      .map((o) => {
+        const due = o.dueDate ? new Date(o.dueDate) : now;
+        const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        let alertType: Alert["type"] = "upcoming";
+        if (diffDays < 0) alertType = "overdue";
+        else if (diffDays <= 3) alertType = "urgent";
+        else if (diffDays <= 7) alertType = "upcoming";
+        else alertType = "early-warning";
+        if (o.status === "at_risk" && o.dependencies.length > 0) alertType = "dependency";
+        return {
+          id: `alert-${o.id}`,
+          obligationId: o.id,
+          type: alertType,
+          message: diffDays < 0
+            ? `${o.name} is ${Math.abs(diffDays)} days overdue`
+            : `${o.name} due in ${diffDays} days`,
+          daysUntilDue: diffDays,
+          role: o.assignedTo || "Unassigned",
+          read: false,
+          createdAt: now,
+        } as Alert;
+      });
+  }, [obligations]);
+
+  // Derive todo items from obligations' documentation requirements
+  const [todoCompleted, setTodoCompleted] = useState<Set<string>>(new Set());
+  const todoItems = useMemo<TodoItem[]>(() => {
+    return obligations.flatMap((o) =>
+      o.documentationRequired.map((doc, i) => ({
+        id: `todo-${o.id}-${i}`,
+        task: doc,
+        description: `Prepare ${doc} for ${o.name}`,
+        completed: todoCompleted.has(`todo-${o.id}-${i}`),
+        obligationId: o.id,
+        obligationName: o.name,
+        priority: o.priority,
+        dueDate: o.dueDate,
+      })),
+    );
+  }, [obligations, todoCompleted]);
 
   const filteredObligations = obligations.filter((obl) => {
     if (filter === "all") return true;
@@ -317,7 +110,7 @@ export function ComplianceCalendar() {
   });
 
   const dependencyAlerts: DependencyAlert[] = obligations
-    .filter((obl) => obl.status === "at-risk" && obl.dependencies.length > 0)
+    .filter((obl) => obl.status === "at_risk" && obl.dependencies.length > 0)
     .map((obl) => ({
       obligationId: obl.id,
       missingDependencies: obl.dependencies,
@@ -330,7 +123,7 @@ export function ComplianceCalendar() {
         return "bg-green-100 text-green-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
-      case "at-risk":
+      case "at_risk":
         return "bg-orange-100 text-orange-800";
       case "overdue":
         return "bg-red-100 text-red-800";
@@ -367,7 +160,7 @@ export function ComplianceCalendar() {
               <div>
                 <div className="text-sm text-orange-700">At Risk</div>
                 <div className="text-lg font-bold text-orange-900">
-                  {obligations.filter((o) => o.status === "at-risk").length}
+                  {obligations.filter((o) => o.status === "at_risk").length}
                 </div>
               </div>
             </div>
@@ -468,7 +261,7 @@ export function ComplianceCalendar() {
                   >
                     <option value="all">All Obligations</option>
                     <option value="pending">Pending</option>
-                    <option value="at-risk">At Risk</option>
+                    <option value="at_risk">At Risk</option>
                     <option value="overdue">Overdue</option>
                   </select>
                 </div>
@@ -522,7 +315,7 @@ export function ComplianceCalendar() {
                         <div>
                           <span className="text-gray-600">Due Date:</span>
                           <div className="font-medium">
-                            {obl.dueDate.toLocaleDateString()}
+                            {obl.dueDate ? new Date(obl.dueDate).toLocaleDateString() : "N/A"}
                           </div>
                         </div>
                         <div>
@@ -604,7 +397,7 @@ export function ComplianceCalendar() {
                       <p>
                         <span className="text-gray-600">Due Date:</span>
                         <span className="ml-2 font-medium">
-                          {selectedObligation.dueDate.toLocaleDateString()}
+                          {selectedObligation.dueDate ? new Date(selectedObligation.dueDate).toLocaleDateString() : "N/A"}
                         </span>
                       </p>
                       <p>
@@ -652,7 +445,7 @@ export function ComplianceCalendar() {
                         </span>
                       </p>
                       <p className="text-xs text-gray-700 mt-2 italic">
-                        {selectedObligation.consequence_detail}
+                        {selectedObligation.consequenceDetail}
                       </p>
                     </div>
                   </div>
@@ -757,13 +550,7 @@ export function ComplianceCalendar() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setAlerts(
-                                alerts.map((a) =>
-                                  a.id === alert.id ? { ...a, read: true } : a,
-                                ),
-                              );
-                            }}
+                            disabled
                           >
                             {alert.read ? "Read" : "Mark Read"}
                           </Button>
@@ -813,13 +600,12 @@ export function ComplianceCalendar() {
                         <div className="flex items-start gap-3">
                           <button
                             onClick={() =>
-                              setTodoItems(
-                                todoItems.map((t) =>
-                                  t.id === item.id
-                                    ? { ...t, completed: !t.completed }
-                                    : t,
-                                ),
-                              )
+                              setTodoCompleted((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(item.id)) next.delete(item.id);
+                                else next.add(item.id);
+                                return next;
+                              })
                             }
                             className="flex-shrink-0 mt-1"
                           >
@@ -870,10 +656,12 @@ export function ComplianceCalendar() {
                               </Badge>
                               <span className="text-xs text-gray-600">
                                 Due:{" "}
-                                {item.dueDate.toLocaleDateString("en-US", {
-                                  month: "short",
-                                  day: "numeric",
-                                })}
+                                {item.dueDate
+                                  ? new Date(item.dueDate).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                    })
+                                  : "N/A"}
                               </span>
                             </div>
                           </div>
@@ -977,7 +765,7 @@ export function ComplianceCalendar() {
             <CardContent className="p-6">
               <div className="space-y-4">
                 {[...obligations]
-                  .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+                  .sort((a, b) => new Date(a.dueDate || "").getTime() - new Date(b.dueDate || "").getTime())
                   .slice(0, 10)
                   .map((obl, idx) => (
                     <div key={obl.id} className="flex gap-4">
@@ -994,7 +782,7 @@ export function ComplianceCalendar() {
                           {obl.name}
                         </div>
                         <div className="text-sm text-gray-600">
-                          Due: {obl.dueDate.toLocaleDateString()}
+                          Due: {obl.dueDate ? new Date(obl.dueDate).toLocaleDateString() : "N/A"}
                         </div>
                         <div className="flex gap-2 mt-1">
                           <Badge

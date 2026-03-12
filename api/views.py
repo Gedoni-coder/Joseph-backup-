@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import filters
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
@@ -26,7 +28,8 @@ from .models import (
     # Pricing
     PriceSetting, PricingRule, PriceForecast,
     # Tax
-    TaxRecord, ComplianceReport,
+    TaxRecord, TaxRecommendation, ComplianceUpdate, TaxPlanningScenario,
+    TaxAuditEvent, ComplianceObligation, ComplianceReport,
     # Policy
     ExternalPolicy, InternalPolicy, StrategyRecommendation,
     # Inventory
@@ -57,7 +60,9 @@ from .serializers import (
     # Pricing
     PriceSettingSerializer, PricingRuleSerializer, PriceForecastSerializer,
     # Tax
-    TaxRecordSerializer, ComplianceReportSerializer,
+    TaxRecordSerializer, TaxRecommendationSerializer, ComplianceUpdateSerializer,
+    TaxPlanningScenarioSerializer, TaxAuditEventSerializer, ComplianceObligationSerializer,
+    ComplianceReportSerializer,
     # Policy
     ExternalPolicySerializer, InternalPolicySerializer, StrategyRecommendationSerializer,
     # Inventory
@@ -72,6 +77,8 @@ from .serializers import (
 class CompanyProfileViewSet(viewsets.ModelViewSet):
     queryset = CompanyProfile.objects.all()
     serializer_class = CompanyProfileSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['company_name', 'sector', 'description']
     ordering_fields = ['company_name', 'created_at', 'updated_at']
@@ -82,21 +89,10 @@ class CompanyProfileViewSet(viewsets.ModelViewSet):
         return CompanyProfileSerializer
 
     def get_queryset(self):
-        # Allow unauthenticated access for onboarding
-        user = self.request.user
-        if user.is_authenticated:
-            return CompanyProfile.objects.filter(user=user)
-        # For unauthenticated users, return profiles without user (onboarding)
-        return CompanyProfile.objects.filter(user__isnull=True)
+        return CompanyProfile.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        # If user is authenticated, use them; otherwise create without user
-        user = self.request.user
-        if user.is_authenticated:
-            serializer.save(user=user)
-        else:
-            # For onboarding without auth, create without user
-            serializer.save(user=None)
+        serializer.save(user=self.request.user)
 
 
 # ==================== ECONOMIC VIEWSETS ====================
@@ -139,62 +135,108 @@ class EconomicEventViewSet(viewsets.ModelViewSet):
 # ==================== BUSINESS VIEWSETS ====================
 
 class CustomerProfileViewSet(viewsets.ModelViewSet):
-    queryset = CustomerProfile.objects.all()
     serializer_class = CustomerProfileSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['segment']
     search_fields = ['segment']
 
+    def get_queryset(self):
+        return CustomerProfile.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class RevenueProjectionViewSet(viewsets.ModelViewSet):
-    queryset = RevenueProjection.objects.all()
     serializer_class = RevenueProjectionSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['period']
     ordering_fields = ['period', 'projected_revenue']
 
+    def get_queryset(self):
+        return RevenueProjection.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class CostStructureViewSet(viewsets.ModelViewSet):
-    queryset = CostStructure.objects.all()
     serializer_class = CostStructureSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['category', 'period']
     ordering_fields = ['category', 'amount']
 
+    def get_queryset(self):
+        return CostStructure.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class CashFlowForecastViewSet(viewsets.ModelViewSet):
-    queryset = CashFlowForecast.objects.all()
     serializer_class = CashFlowForecastSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['period']
     ordering_fields = ['period', 'net_position']
 
+    def get_queryset(self):
+        return CashFlowForecast.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class KPIViewSet(viewsets.ModelViewSet):
-    queryset = KPI.objects.all()
     serializer_class = KPISerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['category']
-    ordering_fields = ['name', 'current', 'target']
+    filterset_fields = ['status']
+    ordering_fields = ['name', 'current_value', 'target_value']
+
+    def get_queryset(self):
+        return KPI.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class ScenarioPlanningViewSet(viewsets.ModelViewSet):
-    queryset = ScenarioPlanning.objects.all()
     serializer_class = ScenarioPlanningSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['type']
     ordering_fields = ['type', 'probability']
 
+    def get_queryset(self):
+        return ScenarioPlanning.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.all()
     serializer_class = DocumentSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['file_type']
     ordering_fields = ['uploaded_at', 'title']
 
+    def get_queryset(self):
+        return Document.objects.filter(uploaded_by=self.request.user)
+
     def perform_create(self, serializer):
-        serializer.save(uploaded_by=self.request.user if self.request.user.is_authenticated else None)
+        serializer.save(uploaded_by=self.request.user)
 
 
 # ==================== MARKET VIEWSETS ====================
@@ -400,19 +442,108 @@ class PriceForecastViewSet(viewsets.ModelViewSet):
 # ==================== TAX VIEWSETS ====================
 
 class TaxRecordViewSet(viewsets.ModelViewSet):
-    queryset = TaxRecord.objects.all()
     serializer_class = TaxRecordSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['tax_type', 'status', 'period']
-    ordering_fields = ['due_date', 'amount']
+    filterset_fields = ['status', 'tax_year']
+    ordering_fields = ['updated_at', 'estimated_tax']
+
+    def get_queryset(self):
+        return TaxRecord.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TaxRecommendationViewSet(viewsets.ModelViewSet):
+    serializer_class = TaxRecommendationSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['category', 'priority', 'implemented']
+    ordering_fields = ['potential_savings', 'created_at']
+
+    def get_queryset(self):
+        return TaxRecommendation.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ComplianceUpdateViewSet(viewsets.ModelViewSet):
+    serializer_class = ComplianceUpdateSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['type', 'jurisdiction', 'status', 'impact']
+    ordering_fields = ['effective_date', 'created_at']
+
+    def get_queryset(self):
+        return ComplianceUpdate.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TaxPlanningScenarioViewSet(viewsets.ModelViewSet):
+    serializer_class = TaxPlanningScenarioSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['risk_level']
+    ordering_fields = ['savings', 'confidence']
+
+    def get_queryset(self):
+        return TaxPlanningScenario.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TaxAuditEventViewSet(viewsets.ModelViewSet):
+    serializer_class = TaxAuditEventSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['outcome', 'category']
+    ordering_fields = ['created_at']
+
+    def get_queryset(self):
+        return TaxAuditEvent.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ComplianceObligationViewSet(viewsets.ModelViewSet):
+    serializer_class = ComplianceObligationSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ['status', 'frequency', 'priority']
+    ordering_fields = ['due_date', 'priority']
+
+    def get_queryset(self):
+        return ComplianceObligation.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class ComplianceReportViewSet(viewsets.ModelViewSet):
-    queryset = ComplianceReport.objects.all()
     serializer_class = ComplianceReportSerializer
+    authentication_classes = [TokenAuthentication, SessionAuthentication]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['status', 'period']
-    ordering_fields = ['created_at', 'period']
+    filterset_fields = ['status', 'type', 'period']
+    ordering_fields = ['due_date', 'created_at']
+
+    def get_queryset(self):
+        return ComplianceReport.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 # ==================== POLICY VIEWSETS ====================

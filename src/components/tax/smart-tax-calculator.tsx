@@ -19,7 +19,7 @@ import { useState } from "react";
 
 interface SmartTaxCalculatorProps {
   calculations: TaxCalculation[];
-  onUpdateCalculation: (id: string, updates: Partial<TaxCalculation>) => void;
+  onUpdateCalculation: (id: number, updates: Partial<TaxCalculation>) => void;
   title?: string;
 }
 
@@ -28,8 +28,8 @@ export function SmartTaxCalculator({
   onUpdateCalculation,
   title = "Smart Tax Calculator",
 }: SmartTaxCalculatorProps) {
-  const [selectedCalculation, setSelectedCalculation] = useState<string>(
-    calculations[0]?.id || "",
+  const [selectedCalculation, setSelectedCalculation] = useState<number | null>(
+    calculations[0]?.id ?? null,
   );
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -314,28 +314,28 @@ export function SmartTaxCalculator({
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">Federal Income Tax</span>
+                      <span className="text-sm">Taxable Income</span>
                       <span className="font-semibold">
-                        {formatCurrency(currentCalc.estimatedTax * 0.85)}
+                        {formatCurrency(currentCalc.taxableIncome)}
                       </span>
                     </div>
-                    <Progress value={85} className="h-2" />
+                    <Progress value={currentCalc.income > 0 ? (currentCalc.taxableIncome / currentCalc.income) * 100 : 0} className="h-2" />
 
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">State Income Tax</span>
+                      <span className="text-sm">Effective Tax Rate</span>
                       <span className="font-semibold">
-                        {formatCurrency(currentCalc.estimatedTax * 0.12)}
+                        {currentCalc.effectiveRate.toFixed(1)}%
                       </span>
                     </div>
-                    <Progress value={12} className="h-2" />
+                    <Progress value={currentCalc.effectiveRate} className="h-2" />
 
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">Other Taxes</span>
+                      <span className="text-sm">Marginal Tax Rate</span>
                       <span className="font-semibold">
-                        {formatCurrency(currentCalc.estimatedTax * 0.03)}
+                        {currentCalc.marginalRate.toFixed(1)}%
                       </span>
                     </div>
-                    <Progress value={3} className="h-2" />
+                    <Progress value={currentCalc.marginalRate} className="h-2" />
 
                     <div className="border-t pt-4 flex justify-between items-center font-semibold">
                       <span>Total Estimated Tax</span>

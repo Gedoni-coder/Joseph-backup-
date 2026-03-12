@@ -1,9 +1,18 @@
 /**
  * Django API Client
  * Base client for making requests to the Django REST API
+ *
+ * Uses relative URLs so Vite's dev-server proxy (/api → Django) works
+ * automatically. In production set VITE_API_BASE_URL to the real origin.
  */
 
-const DJANGO_API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const DJANGO_API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+
+/** Pull the DRF auth token from localStorage (same key used by auth-context). */
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("authToken");
+  return token ? { Authorization: `Token ${token}` } : {};
+}
 
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -26,6 +35,7 @@ export async function djangoRequest<T>(
     method,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
       ...headers,
     },
   };
