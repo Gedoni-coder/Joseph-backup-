@@ -1,5 +1,14 @@
 const COMPANY_API_BASE = "/api/company";
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("authToken");
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Token ${token}`;
+  }
+  return headers;
+}
+
 export interface CompanyProfile {
   id?: number;
   company_name: string;
@@ -28,22 +37,18 @@ export interface CompanyProfile {
  * Get all company profiles for the current user
  */
 export async function getCompanyProfiles(): Promise<CompanyProfile[]> {
-  console.log("Fetching company profiles from:", `${COMPANY_API_BASE}/profiles/`);
   const response = await fetch(`${COMPANY_API_BASE}/profiles/`, {
     method: "GET",
-    credentials: "include",
+    headers: { ...authHeaders() },
   });
 
-  console.log("Response status:", response.status);
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Error response:", errorText);
     throw new Error(`Failed to fetch company profiles: ${response.status}`);
   }
 
   const data = await response.json();
-  console.log("Company profiles data:", data);
-  return data;
+  // DRF may wrap results in { results: [...] } when paginated
+  return Array.isArray(data) ? data : data.results ?? [];
 }
 
 /**
@@ -52,7 +57,7 @@ export async function getCompanyProfiles(): Promise<CompanyProfile[]> {
 export async function getCompanyProfile(id: number): Promise<CompanyProfile> {
   const response = await fetch(`${COMPANY_API_BASE}/profiles/${id}/`, {
     method: "GET",
-    credentials: "include",
+    headers: { ...authHeaders() },
   });
 
   if (!response.ok) {
@@ -72,9 +77,9 @@ export async function createCompanyProfile(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
     body: JSON.stringify(data),
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -96,9 +101,9 @@ export async function updateCompanyProfile(
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders(),
     },
     body: JSON.stringify(data),
-    credentials: "include",
   });
 
   if (!response.ok) {
@@ -115,7 +120,7 @@ export async function updateCompanyProfile(
 export async function deleteCompanyProfile(id: number): Promise<void> {
   const response = await fetch(`${COMPANY_API_BASE}/profiles/${id}/`, {
     method: "DELETE",
-    credentials: "include",
+    headers: { ...authHeaders() },
   });
 
   if (!response.ok) {

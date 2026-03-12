@@ -136,6 +136,8 @@ class CustomerProfile(models.Model):
     ]
     RISK_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='customer_profiles', null=True, blank=True)
+    
     # Basic fields
     name = models.CharField(max_length=200)
     email = models.EmailField()
@@ -166,6 +168,8 @@ class RevenueProjection(models.Model):
         ('1y', '1 Year'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='revenue_projections', null=True, blank=True)
+    
     name = models.CharField(max_length=200)
     period = models.CharField(max_length=10, choices=PERIOD_CHOICES)
     projected_revenue = models.FloatField()
@@ -190,6 +194,8 @@ class CostStructure(models.Model):
         ('semi_variable', 'Semi-Variable'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cost_structures', null=True, blank=True)
+    
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     amount = models.FloatField()
@@ -208,6 +214,8 @@ class CashFlowForecast(models.Model):
         ('quarterly', 'Quarterly'),
     ]
     
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cash_flow_forecasts', null=True, blank=True)
+    
     name = models.CharField(max_length=200)
     period = models.CharField(max_length=20, choices=PERIOD_CHOICES, default='monthly')
     cash_inflow = models.FloatField(default=0)
@@ -222,6 +230,8 @@ class CashFlowForecast(models.Model):
 
 class KPI(models.Model):
     STATUS_CHOICES = [('on_track', 'On Track'), ('at_risk', 'At Risk'), ('off_track', 'Off Track')]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='kpis', null=True, blank=True)
     
     name = models.CharField(max_length=200)
     current_value = models.FloatField()
@@ -238,6 +248,8 @@ class KPI(models.Model):
 
 class ScenarioPlanning(models.Model):
     TYPE_CHOICES = [('optimistic', 'Optimistic'), ('pessimistic', 'Pessimistic'), ('base', 'Base Case')]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='scenario_plannings', null=True, blank=True)
     
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='base')
@@ -640,32 +652,171 @@ class PriceForecast(models.Model):
 # ==================== TAX MODELS ====================
 
 class TaxRecord(models.Model):
-    STATUS_CHOICES = [('paid', 'Paid'), ('pending', 'Pending'), ('overdue', 'Overdue')]
-    
-    tax_type = models.CharField(max_length=100)
-    amount = models.FloatField()
-    period = models.CharField(max_length=20)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    due_date = models.DateField()
-    paid_date = models.DateField(null=True, blank=True)
+    STATUS_CHOICES = [('draft', 'Draft'), ('calculated', 'Calculated'), ('filed', 'Filed'), ('amended', 'Amended')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tax_records', null=True, blank=True)
+    entity = models.CharField(max_length=200, default='', help_text="Company or entity name")
+    tax_year = models.IntegerField(default=2024)
+    income = models.FloatField(default=0)
+    deductions = models.FloatField(default=0)
+    taxable_income = models.FloatField(default=0)
+    estimated_tax = models.FloatField(default=0)
+    effective_rate = models.FloatField(default=0)
+    marginal_rate = models.FloatField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"{self.entity} - {self.tax_year}"
+
+
+class TaxRecommendation(models.Model):
+    CATEGORY_CHOICES = [
+        ('deduction', 'Deduction'), ('credit', 'Credit'), ('timing', 'Timing'),
+        ('structure', 'Structure'), ('investment', 'Investment'),
+    ]
+    COMPLEXITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+    PRIORITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tax_recommendations', null=True, blank=True)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='deduction')
+    potential_savings = models.FloatField(default=0)
+    complexity = models.CharField(max_length=20, choices=COMPLEXITY_CHOICES, default='medium')
+    deadline = models.DateField(null=True, blank=True)
+    requirements = models.JSONField(default=list)
+    implemented = models.BooleanField(default=False)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.tax_type} - {self.amount}"
+        return self.title
+
+
+class ComplianceUpdate(models.Model):
+    TYPE_CHOICES = [
+        ('regulation', 'Regulation'), ('form', 'Form'), ('deadline', 'Deadline'),
+        ('rate_change', 'Rate Change'), ('guidance', 'Guidance'),
+    ]
+    JURISDICTION_CHOICES = [('federal', 'Federal'), ('state', 'State'), ('local', 'Local')]
+    IMPACT_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+    STATUS_CHOICES = [('new', 'New'), ('reviewed', 'Reviewed'), ('implemented', 'Implemented'), ('archived', 'Archived')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='compliance_updates', null=True, blank=True)
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='regulation')
+    jurisdiction = models.CharField(max_length=20, choices=JURISDICTION_CHOICES, default='federal')
+    effective_date = models.DateField(null=True, blank=True)
+    deadline = models.DateField(null=True, blank=True)
+    impact = models.CharField(max_length=20, choices=IMPACT_CHOICES, default='medium')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    action_required = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
+
+
+class TaxPlanningScenario(models.Model):
+    RISK_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tax_planning_scenarios', null=True, blank=True)
+    name = models.CharField(max_length=200)
+    description = models.TextField()
+    current_tax = models.FloatField(default=0)
+    projected_tax = models.FloatField(default=0)
+    savings = models.FloatField(default=0)
+    timeframe = models.CharField(max_length=100)
+    risk_level = models.CharField(max_length=20, choices=RISK_CHOICES, default='medium')
+    steps = models.JSONField(default=list)
+    confidence = models.IntegerField(default=50)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
+class TaxAuditEvent(models.Model):
+    OUTCOME_CHOICES = [('success', 'Success'), ('failure', 'Failure'), ('warning', 'Warning')]
+    CATEGORY_CHOICES = [
+        ('calculation', 'Calculation'), ('filing', 'Filing'), ('document', 'Document'),
+        ('planning', 'Planning'), ('compliance', 'Compliance'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tax_audit_events', null=True, blank=True)
+    action = models.CharField(max_length=200)
+    entity = models.CharField(max_length=200)
+    details = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES, default='success')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='calculation')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.action} - {self.entity}"
+
+
+class ComplianceObligation(models.Model):
+    FREQUENCY_CHOICES = [
+        ('monthly', 'Monthly'), ('quarterly', 'Quarterly'),
+        ('annually', 'Annually'), ('event_based', 'Event-Based'),
+    ]
+    CONSEQUENCE_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
+    STATUS_CHOICES = [('completed', 'Completed'), ('pending', 'Pending'), ('at_risk', 'At Risk'), ('overdue', 'Overdue')]
+    PRIORITY_CHOICES = [('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='compliance_obligations', null=True, blank=True)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    due_date = models.DateField(null=True, blank=True)
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='monthly')
+    agency = models.CharField(max_length=200)
+    jurisdiction = models.CharField(max_length=200)
+    consequence = models.CharField(max_length=20, choices=CONSEQUENCE_CHOICES, default='medium')
+    consequence_detail = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    assigned_to = models.CharField(max_length=200, blank=True)
+    dependencies = models.JSONField(default=list)
+    documentation_required = models.JSONField(default=list)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['due_date']
+
+    def __str__(self):
+        return self.name
 
 
 class ComplianceReport(models.Model):
-    STATUS_CHOICES = [('compliant', 'Compliant'), ('non_compliant', 'Non-Compliant'), ('pending', 'Pending')]
-    
-    name = models.CharField(max_length=200)
-    description = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    period = models.CharField(max_length=20)
+    STATUS_CHOICES = [('draft', 'Draft'), ('pending', 'Pending'), ('completed', 'Completed'), ('overdue', 'Overdue')]
+    TYPE_CHOICES = [('monthly', 'Monthly'), ('quarterly', 'Quarterly'), ('annual', 'Annual'), ('custom', 'Custom')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='compliance_reports', null=True, blank=True)
+    title = models.CharField(max_length=200, default='')
+    description = models.TextField(blank=True)
+    period = models.CharField(max_length=50)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='quarterly')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    due_date = models.DateField(null=True, blank=True)
+    completion_rate = models.IntegerField(default=0)
+    risk_score = models.IntegerField(default=0)
+    findings_count = models.IntegerField(default=0)
     findings = models.JSONField(default=list)
+    assignee = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.name} - {self.status}"
+        return f"{self.title} - {self.status}"
 
 
 # ==================== POLICY MODELS ====================

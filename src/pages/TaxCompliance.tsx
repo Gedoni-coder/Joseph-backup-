@@ -18,11 +18,6 @@ import { TaxRecommendations } from "@/components/tax/tax-recommendations";
 import { ComplianceUpdates } from "@/components/tax/compliance-updates";
 import { ComplianceCalendar } from "@/components/tax/compliance-calendar";
 import {
-  CURRENCY_CONFIG,
-  FOOTER_COMPLIANCE_TEXT,
-  FOOTER_DATA_SECURITY,
-} from "@/mocks/tax-compliance";
-import {
   Calculator,
   RefreshCw,
   Calendar,
@@ -47,7 +42,7 @@ const TaxCompliance = () => {
     complianceUpdates,
     planningScenarios,
     auditTrail,
-    documents,
+    obligations,
     reports,
     lastUpdated,
     isLoading,
@@ -77,9 +72,9 @@ const TaxCompliance = () => {
     .reduce((sum, rec) => sum + rec.potentialSavings, 0);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat(CURRENCY_CONFIG.locale, {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: CURRENCY_CONFIG.currency,
+      currency: "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -294,7 +289,7 @@ const TaxCompliance = () => {
                 isLoading={isLoading}
                 loadingText="Loading compliance calendar and updates..."
               >
-                <ComplianceCalendar />
+                <ComplianceCalendar obligations={obligations} />
               </LoadingOverlay>
             </section>
           </TabsContent>
@@ -409,7 +404,7 @@ const TaxCompliance = () => {
                             {event.entity} • {event.details}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {event.timestamp.toLocaleString()} • {event.user}
+                            {new Date(event.timestamp).toLocaleString()}
                           </div>
                         </div>
                         <Badge
@@ -467,51 +462,8 @@ const TaxCompliance = () => {
                             </Button>
                           </Link>
                         </div>
-                        {documents.slice(0, 5).map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-2 border border-blue-100 rounded"
-                          >
-                            <div>
-                              <div className="text-sm font-medium">
-                                {doc.name}
-                              </div>
-                              <div className="text-xs text-gray-600">
-                                {doc.entity} • {doc.taxYear}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  window.open(`/documents/${doc.id}`)
-                                }
-                              >
-                                View
-                              </Button>
-                              <Badge
-                                className={
-                                  doc.status === "processed"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                                }
-                              >
-                                {doc.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="text-center mt-3">
-                          <Link to="/document-manager">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="border-blue-200 text-blue-700"
-                            >
-                              Manage All Documents
-                            </Button>
-                          </Link>
+                        <div className="text-center py-8 text-gray-500 text-sm">
+                          No documents uploaded yet. Use the button above to upload documents.
                         </div>
                       </div>
                     </div>
@@ -567,7 +519,7 @@ const TaxCompliance = () => {
                               </div>
                             </div>
                             <div className="text-xs text-gray-600">
-                              Due: {report.dueDate.toLocaleDateString()} •{" "}
+                              Due: {report.dueDate ? new Date(report.dueDate).toLocaleDateString() : "N/A"} •{" "}
                               {report.completionRate}% complete
                             </div>
                           </div>
@@ -602,10 +554,10 @@ const TaxCompliance = () => {
                 © {new Date().getFullYear()} Tax & Compliance Platform
               </span>
               <span>•</span>
-              <span>{FOOTER_DATA_SECURITY}</span>
+              <span>Data secured and encrypted</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-blue-600">
-              <span>{FOOTER_COMPLIANCE_TEXT}</span>
+              <span>Compliance: IRS, State Tax Codes, Local Regulations</span>
             </div>
           </div>
         </div>

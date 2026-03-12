@@ -118,24 +118,8 @@ export function ChatbotContainer({
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  // Conversational mode - handle click to open chatbot
-  useEffect(() => {
-    if (!conversationalMode) return;
-
-    const handlePageClick = (e: MouseEvent) => {
-      // Don't open chatbot if clicking inside it
-      const chatbot = document.querySelector("[data-joseph-no-explain]");
-      if (chatbot && chatbot.contains(e.target as Node)) return;
-
-      // Don't open if already open
-      if (isOpen) return;
-
-      setIsOpen(true);
-    };
-
-    document.addEventListener("click", handlePageClick);
-    return () => document.removeEventListener("click", handlePageClick);
-  }, [conversationalMode, isOpen]);
+  // Conversational mode - removed auto-open on page click.
+  // The chatbot now only opens when the user clicks the floating button.
 
   // Keyboard shortcuts
   useEffect(() => {

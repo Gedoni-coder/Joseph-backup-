@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 interface TaxRecommendationsProps {
   recommendations: TaxAvoidanceRecommendation[];
-  onImplement: (id: string) => void;
+  onImplement: (id: number) => void;
   title?: string;
 }
 
@@ -289,7 +289,7 @@ export function TaxRecommendations({
                         <div className="text-right">
                           <div className="text-xs text-gray-500">Deadline</div>
                           <div className="text-sm font-medium text-red-600">
-                            {rec.deadline.toLocaleDateString()}
+                            {new Date(rec.deadline).toLocaleDateString()}
                           </div>
                         </div>
                       )}

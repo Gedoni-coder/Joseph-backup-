@@ -6,15 +6,9 @@ import React, {
   useCallback,
 } from "react";
 import * as authService from "./api/auth-service";
+import type { UserRecord } from "./api/auth-service";
 
-export interface AuthUser {
-  id: number;
-  created_at: string;
-  name: string;
-  email: string;
-  account_id: number;
-  role: string;
-}
+export type AuthUser = UserRecord;
 
 export interface AuthContextType {
   user: AuthUser | null;
@@ -31,8 +25,6 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_STORAGE_KEY = "authToken";
-const TOKEN_EXPIRY_KEY = "authTokenExpiry";
-const REFRESH_INTERVAL = 7 * 60 * 1000; // 7 minutes (refresh 1 minute before 8 minute expiry)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -44,42 +36,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuthOnMount();
   }, []);
 
-  // Refresh token periodically
-  useEffect(() => {
-    if (!user) return;
-
-    const refreshInterval = setInterval(() => {
-      refreshTokenIfNeeded();
-    }, REFRESH_INTERVAL);
-
-    return () => clearInterval(refreshInterval);
-  }, [user]);
-
   const checkAuthOnMount = async () => {
     setIsLoading(true);
     try {
-      // Check if we have a stored token that's still valid
       const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-      const storedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-
-      if (storedToken && storedExpiry) {
-        const expiryTime = parseInt(storedExpiry, 10);
-        if (expiryTime > Date.now()) {
-          // Token is still valid, try to get user info
-          try {
-            const userRecord = await authService.getMe(storedToken);
-            setUser(userRecord);
-            setError(null);
-          } catch (err) {
-            // Token might be invalid, clear it
-            localStorage.removeItem(TOKEN_STORAGE_KEY);
-            localStorage.removeItem(TOKEN_EXPIRY_KEY);
-            setUser(null);
-          }
-        } else {
-          // Token expired
+      if (storedToken) {
+        try {
+          const userRecord = await authService.getMe(storedToken);
+          setUser(userRecord);
+          setError(null);
+        } catch {
+          // Token is invalid or expired — clear it
           localStorage.removeItem(TOKEN_STORAGE_KEY);
-          localStorage.removeItem(TOKEN_EXPIRY_KEY);
+          setUser(null);
         }
       }
     } catch (err) {
@@ -89,39 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const refreshTokenIfNeeded = async () => {
-    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const storedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-
-    if (!storedToken || !storedExpiry) return;
-
-    const expiryTime = parseInt(storedExpiry, 10);
-    const timeUntilExpiry = expiryTime - Date.now();
-
-    // If token expires in less than 1 minute, try to refresh
-    if (timeUntilExpiry < 60 * 1000) {
-      try {
-        // Set a new expiry time (8 minutes from now)
-        const newExpiryTime = Date.now() + 8 * 60 * 1000;
-        localStorage.setItem(TOKEN_EXPIRY_KEY, newExpiryTime.toString());
-      } catch (err) {
-        console.error("Failed to refresh token:", err);
-        logout();
-      }
-    }
-  };
-
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await authService.login({ email, password });
 
-      // Store token and set expiry (8 minutes)
-      const tokenExpiry = Date.now() + 8 * 60 * 1000;
+      // Store real DRF token
       localStorage.setItem(TOKEN_STORAGE_KEY, response.authToken);
-      localStorage.setItem(TOKEN_EXPIRY_KEY, tokenExpiry.toString());
-
       setUser(response.user);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
@@ -137,13 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
       try {
+        // Clear any previous user's company data before setting up the new account
+        localStorage.removeItem("joseph:companyInfo");
+
         const response = await authService.signup({ email, password, name });
 
-        // Store token and set expiry (8 minutes)
-        const tokenExpiry = Date.now() + 8 * 60 * 1000;
+        // Store real DRF token
         localStorage.setItem(TOKEN_STORAGE_KEY, response.authToken);
-        localStorage.setItem(TOKEN_EXPIRY_KEY, tokenExpiry.toString());
-
         setUser(response.user);
       } catch (err) {
         const errorMessage =
@@ -160,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     authService.logout();
     localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+    localStorage.removeItem("joseph:companyInfo");
     setUser(null);
     setError(null);
   }, []);
@@ -180,9 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRecord = await authService.getMe(storedToken);
       setUser(userRecord);
       setError(null);
-    } catch (err) {
+    } catch {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
-      localStorage.removeItem(TOKEN_EXPIRY_KEY);
       setUser(null);
     }
   }, []);

@@ -21,7 +21,8 @@ from .models import (
     # Pricing
     PriceSetting, PricingRule, PriceForecast,
     # Tax
-    TaxRecord, ComplianceReport,
+    TaxRecord, TaxRecommendation, ComplianceUpdate, TaxPlanningScenario,
+    TaxAuditEvent, ComplianceObligation, ComplianceReport,
     # Policy
     ExternalPolicy, InternalPolicy, StrategyRecommendation,
     # Inventory
@@ -197,11 +198,31 @@ class PriceForecastAdmin(admin.ModelAdmin):
 # Tax
 @admin.register(TaxRecord)
 class TaxRecordAdmin(admin.ModelAdmin):
-    list_display = ('tax_type', 'amount', 'period', 'status', 'due_date')
+    list_display = ('entity', 'tax_year', 'taxable_income', 'estimated_tax', 'effective_rate', 'status')
+
+@admin.register(TaxRecommendation)
+class TaxRecommendationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'potential_savings', 'priority', 'implemented')
+
+@admin.register(ComplianceUpdate)
+class ComplianceUpdateAdmin(admin.ModelAdmin):
+    list_display = ('title', 'type', 'jurisdiction', 'impact', 'status', 'effective_date')
+
+@admin.register(TaxPlanningScenario)
+class TaxPlanningScenarioAdmin(admin.ModelAdmin):
+    list_display = ('name', 'current_tax', 'projected_tax', 'savings', 'risk_level', 'confidence')
+
+@admin.register(TaxAuditEvent)
+class TaxAuditEventAdmin(admin.ModelAdmin):
+    list_display = ('action', 'entity', 'outcome', 'category', 'created_at')
+
+@admin.register(ComplianceObligation)
+class ComplianceObligationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'due_date', 'frequency', 'agency', 'status', 'priority')
 
 @admin.register(ComplianceReport)
 class ComplianceReportAdmin(admin.ModelAdmin):
-    list_display = ('name', 'status', 'period', 'created_at')
+    list_display = ('title', 'type', 'status', 'period', 'due_date', 'completion_rate')
 
 # Policy
 @admin.register(ExternalPolicy)

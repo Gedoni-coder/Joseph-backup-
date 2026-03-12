@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 interface ComplianceUpdatesProps {
   updates: ComplianceUpdate[];
   onUpdateStatus: (
-    id: string,
+    id: number,
     status: "new" | "reviewed" | "implemented" | "archived",
   ) => void;
   title?: string;
@@ -121,18 +121,19 @@ export function ComplianceUpdates({
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
+  const formatDate = (date?: string | null) => {
+    if (!date) return "N/A";
+    return new Date(date).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     });
   };
 
-  const getDaysUntilDeadline = (deadline?: Date) => {
+  const getDaysUntilDeadline = (deadline?: string | null) => {
     if (!deadline) return null;
     const now = new Date();
-    const diffTime = deadline.getTime() - now.getTime();
+    const diffTime = new Date(deadline).getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
