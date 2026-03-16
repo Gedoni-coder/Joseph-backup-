@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import ModuleHeader from "@/components/ui/module-header";
 import { useCompanyInfo } from "@/lib/company-context";
 import { getCompanyName } from "@/lib/get-company-name";
 import { useTaxDataAPI } from "@/hooks/useTaxDataAPI";
+import { generateComplianceObligations } from "@/lib/calculations";
+import type { ComplianceObligation } from "@/lib/tax-compliance-data";
 import { SmartTaxCalculator } from "@/components/tax/smart-tax-calculator";
 import { TaxRecommendations } from "@/components/tax/tax-recommendations";
 import { ComplianceUpdates } from "@/components/tax/compliance-updates";
@@ -54,6 +56,31 @@ const TaxCompliance = () => {
     updateComplianceStatus,
     reconnect,
   } = useTaxDataAPI();
+
+  // When the API returns no obligations (backend unavailable or empty),
+  // fall back to the statically-defined baseObligations so the UI always
+  // shows something meaningful and new entries added to baseObligations
+  // are immediately visible.
+  const displayObligations = useMemo<ComplianceObligation[]>(() => {
+    if (obligations.length > 0) return obligations;
+    // Use negative IDs to avoid collisions with Django PKs (always positive integers).
+    return generateComplianceObligations([], new Date()).map((g, i) => ({
+      id: -(i + 1),
+      name: g.name,
+      description: g.description,
+      dueDate: g.dueDate.toISOString().split("T")[0],
+      frequency: g.frequency,
+      agency: g.agency,
+      jurisdiction: g.jurisdiction,
+      consequence: g.consequence,
+      consequenceDetail: g.consequenceDetail,
+      status: g.status,
+      assignedTo: g.assignedTo,
+      dependencies: g.dependencies,
+      documentationRequired: g.documentationRequired,
+      priority: g.priority,
+    }));
+  }, [obligations]);
 
   const handleRefresh = async () => {
     await refreshData();
@@ -289,7 +316,7 @@ const TaxCompliance = () => {
                 isLoading={isLoading}
                 loadingText="Loading compliance calendar and updates..."
               >
-                <ComplianceCalendar obligations={obligations} />
+                <ComplianceCalendar obligations={displayObligations} />
               </LoadingOverlay>
             </section>
           </TabsContent>

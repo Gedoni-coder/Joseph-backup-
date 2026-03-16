@@ -10,7 +10,7 @@ export interface ComplianceObligationInput {
   name: string;
   description: string;
   baseDueDate: Date;
-  frequency: "monthly" | "quarterly" | "annually" | "event-based";
+  frequency: "monthly" | "quarterly" | "annually" | "event_based";
   agency: string;
   jurisdiction: string;
   consequence: "low" | "medium" | "high" | "critical";
@@ -23,7 +23,7 @@ export interface ComplianceObligationInput {
 
 export interface ComplianceObligation extends ComplianceObligationInput {
   dueDate: Date;
-  status: "completed" | "pending" | "at-risk" | "overdue";
+  status: "completed" | "pending" | "at_risk" | "overdue";
   daysUntilDue: number;
 }
 
@@ -148,7 +148,7 @@ const baseObligations: Omit<ComplianceObligation, "dueDate" | "status" | "daysUn
  */
 export function calculateNextDueDate(
   baseDate: Date,
-  frequency: "monthly" | "quarterly" | "annually" | "event-based",
+  frequency: "monthly" | "quarterly" | "annually" | "event_based",
   referenceDate: Date = new Date()
 ): Date {
   let nextDue = new Date(baseDate);
@@ -164,7 +164,7 @@ export function calculateNextDueDate(
       case "annually":
         nextDue = addMonths(nextDue, 12);
         break;
-      case "event-based":
+      case "event_based":
         return nextDue;
     }
   }
@@ -178,13 +178,13 @@ export function calculateNextDueDate(
 export function calculateObligationStatus(
   dueDate: Date,
   referenceDate: Date = new Date()
-): "completed" | "pending" | "at-risk" | "overdue" {
+): "completed" | "pending" | "at_risk" | "overdue" {
   const daysUntil = differenceInDays(dueDate, referenceDate);
 
   if (daysUntil < 0) {
     return "overdue";
   } else if (daysUntil <= 7) {
-    return "at-risk";
+    return "at_risk";
   } else {
     return "pending";
   }
@@ -402,7 +402,7 @@ export function getCalendarStats(obligations: ComplianceObligation[]) {
     total: obligations.length,
     completed: obligations.filter(o => o.status === "completed").length,
     pending: obligations.filter(o => o.status === "pending").length,
-    atRisk: obligations.filter(o => o.status === "at-risk").length,
+    atRisk: obligations.filter(o => o.status === "at_risk").length,
     overdue: obligations.filter(o => o.status === "overdue").length,
     criticalCount: obligations.filter(o => o.priority === "critical" && o.status !== "completed").length,
     highPriorityCount: obligations.filter(o => o.priority === "high" && o.status !== "completed").length,
@@ -414,7 +414,7 @@ export function getCalendarStats(obligations: ComplianceObligation[]) {
  */
 export function filterObligationsByStatus(
   obligations: ComplianceObligation[],
-  status: "all" | "completed" | "pending" | "at-risk" | "overdue"
+  status: "all" | "completed" | "pending" | "at_risk" | "overdue"
 ): ComplianceObligation[] {
   if (status === "all") return obligations;
   return obligations.filter(o => o.status === status);
