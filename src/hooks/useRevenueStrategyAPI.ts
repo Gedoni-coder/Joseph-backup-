@@ -1,8 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  getRevenueStrategies,
-  RevenueStrategyData,
-} from "@/lib/api/revenue-strategy-service";
+import { getRevenueOverviewMetrics } from "@/lib/api/revenue-strategy-service";
 
 interface TransformedRevenueData {
   monthlyRecurringRevenue: number;
@@ -20,42 +17,19 @@ interface TransformedRevenueData {
   lastUpdated: Date;
 }
 
-/**
- * Transform Xano API response to component-ready data structures
- */
-function transformRevenueStrategyData(
-  data: RevenueStrategyData[]
-): TransformedRevenueData {
-  if (!data || data.length === 0) {
-    return {
-      monthlyRecurringRevenue: 0,
-      annualContractValue: 0,
-      customerLifetimeValue: 0,
-      revenuePerCustomer: 0,
-      netRevenueRetention: 0,
-      streams: [],
-      churnAnalysis: [],
-      upsellOpportunities: [],
-      recommendations: [],
-      isLoading: false,
-      error: null,
-      isConnected: true,
-      lastUpdated: new Date(),
-    };
-  }
-
-  const record = data[0];
+function transformMetricsToLegacyShape(data: Awaited<ReturnType<typeof getRevenueOverviewMetrics>>): TransformedRevenueData {
+  const getValue = (name: string) => data.find((item) => item.name === name)?.value ?? 0;
 
   return {
-    monthlyRecurringRevenue: record.monthly_recurring_revenue,
-    annualContractValue: record.annual_contract_value,
-    customerLifetimeValue: record.customer_lifetime_value,
-    revenuePerCustomer: record.revenue_per_customer,
-    netRevenueRetention: record.net_revenue_retention,
-    streams: record.top_revenue_streams || [],
-    churnAnalysis: record.churn_analysis || [],
-    upsellOpportunities: record.top_upsell_opportunities || [],
-    recommendations: record.revenue_strategy_recommendations || [],
+    monthlyRecurringRevenue: getValue("Monthly Recurring Revenue"),
+    annualContractValue: getValue("Annual Contract Value"),
+    customerLifetimeValue: getValue("Customer Lifetime Value"),
+    revenuePerCustomer: getValue("Revenue per Customer"),
+    netRevenueRetention: getValue("Net Revenue Retention"),
+    streams: [],
+    churnAnalysis: [],
+    upsellOpportunities: [],
+    recommendations: [],
     isLoading: false,
     error: null,
     isConnected: true,
@@ -63,19 +37,15 @@ function transformRevenueStrategyData(
   };
 }
 
-/**
- * Hook to fetch and transform revenue strategy data
- */
 export function useRevenueStrategyAPI() {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["revenue-strategy"],
-    queryFn: () => getRevenueStrategies(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ["revenue", "legacy-overview"],
+    queryFn: getRevenueOverviewMetrics,
+    staleTime: 5 * 60 * 1000,
     retry: 2,
   });
 
-  const transformed = transformRevenueStrategyData(data || []);
+  const transformed = transformMetricsToLegacyShape(data ?? []);
 
   return {
     ...transformed,

@@ -133,6 +133,7 @@ const solutionGroups: NavGroup[] = [
       { title: "Audit Reports", url: "/audit-reports", icon: ClipboardList },
       { title: "Risk Management", url: "/risk-management", icon: AlertTriangle },
       { title: "Notifications", url: "/notifications", icon: Bell },
+      { title: "Advice Hub", url: "/advice", icon: Lightbulb },
     ],
   },
 ];

@@ -7,6 +7,7 @@ from .ingest import ingest_document, IngestResult
 from .extract import extract_document, ExtractionResult
 from .normalize import normalize_document, NormalizeResult
 from .metadata import generate_metadata, DocumentMetadata
+from .django_integration import process_stored_document
 
 __all__ = [
     "process_document",
@@ -20,4 +21,5 @@ __all__ = [
     "NormalizeResult",
     "generate_metadata",
     "DocumentMetadata",
+    "process_stored_document",
 ]

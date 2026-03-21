@@ -1,29 +1,9 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  LoadingOverlay,
-  MetricCardSkeleton,
-} from "@/components/ui/loading-spinner";
-import {
-  ConnectionStatus,
-  DataFreshness,
-} from "@/components/ui/connection-status";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { LoadingOverlay } from "@/components/ui/loading-spinner";
 import ModuleHeader from "@/components/ui/module-header";
-import { NotificationsIdeasPopovers } from "@/components/ui/notifications-ideas-popovers";
 import { ContextSwitcher } from "@/components/economic/context-switcher";
 import { MetricsDashboard } from "@/components/economic/metrics-dashboard";
 import { EconomicTable } from "@/components/economic/economic-table";
@@ -31,82 +11,54 @@ import { ForecastPanel } from "@/components/economic/forecast-panel";
 import { UpcomingEvents } from "@/components/economic/upcoming-events";
 import { useEconomicData } from "@/hooks/useEconomicData";
 import { useCompanyInfo } from "@/lib/company-context";
-import { EconomicContext } from "@/lib/economic-data";
-import { COMPANY_NAME } from "@/lib/company-config";
 import { getCompanyName } from "@/lib/get-company-name";
-import {
-  MARKET_ALERTS,
-  KEY_TAKEAWAYS,
-  ECONOMIC_OUTLOOK,
-  ECONOMIC_FOOTER,
-  SENTIMENT_COLOR_MAP,
-  ALERT_STYLE_MAP,
-} from "@/lib/economic-content";
-import {
-  ECONOMIC_CONTEXT_CONFIG,
-  ECONOMIC_REFRESH_ALERT,
-  UPDATE_TYPES,
-  STREAM_UPDATE_INTERVAL,
-  STREAM_JITTER,
-  ACTIVE_UPDATE_TIMEOUT,
-} from "@/mocks/economic-indicators";
+import { Activity, AlertTriangle, Calendar, RefreshCw, Wifi } from "lucide-react";
 
-// Type aliases to match component expectations
-type EconomicNews = {
-  id: number;
-  context: string;
-  title: string;
-  summary: string;
-  source: string;
-  timestamp: string;
-  impact: string;
-  category: string;
+type TrendType = "stable" | "volatile" | "trending";
+
+type RiskLevel = "Low" | "Moderate" | "High";
+
+const CONTEXT_ORDER = ["local", "state", "national", "international"] as const;
+
+const CONTEXT_LABELS: Record<string, string> = {
+  local: "Local",
+  state: "State",
+  national: "National",
+  international: "International",
 };
 
-type EconomicForecast = {
-  id: number;
-  context: string;
-  indicator: string;
-  period: string;
-  forecast: number;
-  confidence: number;
-  range_low: number;
-  range_high: number;
+const prettifyContextLabel = (context: string) => {
+  const key = context.toLowerCase();
+  if (CONTEXT_LABELS[key]) return CONTEXT_LABELS[key];
+  return context
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-type EconomicEvent = {
-  id: number;
-  context: string;
-  title: string;
-  date: string;
-  description: string;
-  impact: string;
-  category: string;
+const getContextDescription = (context: string, metricCount: number) => {
+  if (context.toLowerCase() === "national") {
+    return "National market indicators";
+  }
+  if (context.toLowerCase().includes("local")) {
+    return "Local market indicators";
+  }
+  if (context.toLowerCase().includes("state")) {
+    return "State-level indicators";
+  }
+  if (context.toLowerCase().includes("international") || context.toLowerCase().includes("global")) {
+    return "Global market indicators";
+  }
+  return `${metricCount} tracked indicators`;
 };
-import { cn } from "@/lib/utils";
-import {
-  Activity,
-  RefreshCw,
-  AlertTriangle,
-  TrendingUp,
-  Calendar,
-  BarChart3,
-  Calculator,
-  Wifi,
-  Globe,
-  Bell,
-  Lightbulb,
-  X,
-} from "lucide-react";
+
+const getTrendStatus = (avgAbsoluteChange: number): TrendType => {
+  if (avgAbsoluteChange >= 5) return "volatile";
+  if (avgAbsoluteChange >= 1) return "trending";
+  return "stable";
+};
 
 const Index = () => {
-  const [activeContext, setActiveContext] =
-    useState<EconomicContext>("national");
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [ideasOpen, setIdeasOpen] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(true);
-  const [lastDataUpdate, setLastDataUpdate] = useState(new Date());
-  const [activeUpdates, setActiveUpdates] = useState<string[]>([]);
+  const [activeContext, setActiveContext] = useState<string>("");
 
   const { companyInfo } = useCompanyInfo();
   const companyName = getCompanyName(companyInfo?.companyName);
@@ -124,303 +76,304 @@ const Index = () => {
     reconnect,
   } = useEconomicData(companyName);
 
-  // Add null safety checks
-  const currentMetrics = metrics[activeContext] || [];
-  const currentNews = news[activeContext] || [];
-  const currentForecasts = forecasts[activeContext] || [];
-  const currentEvents = events[activeContext] || [];
+  const contextKeys = useMemo(() => {
+    const all = new Set<string>();
+    Object.keys(metrics).forEach((key) => all.add(key));
+    Object.keys(news).forEach((key) => all.add(key));
+    Object.keys(forecasts).forEach((key) => all.add(key));
+    Object.keys(events).forEach((key) => all.add(key));
+
+    // Always keep the four economic contexts visible in UI.
+    CONTEXT_ORDER.forEach((key) => all.add(key));
+
+    return Array.from(all).sort((a, b) => {
+      const aIndex = CONTEXT_ORDER.indexOf(a as (typeof CONTEXT_ORDER)[number]);
+      const bIndex = CONTEXT_ORDER.indexOf(b as (typeof CONTEXT_ORDER)[number]);
+      const aOrder = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+      const bOrder = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.localeCompare(b);
+    });
+  }, [metrics, news, forecasts, events]);
+
+  useEffect(() => {
+    if (!activeContext && contextKeys.length > 0) {
+      setActiveContext(contextKeys.includes("national") ? "national" : contextKeys[0]);
+    }
+    if (activeContext && contextKeys.length > 0 && !contextKeys.includes(activeContext)) {
+      setActiveContext(contextKeys[0]);
+    }
+  }, [activeContext, contextKeys]);
+
+  const contextSummaries = useMemo(() => {
+    return contextKeys.map((context) => {
+      const metricsForContext = metrics[context] || [];
+      const avgChange =
+        metricsForContext.length > 0
+          ? metricsForContext.reduce((sum, item) => sum + item.change, 0) / metricsForContext.length
+          : 0;
+
+      const avgAbsoluteChange =
+        metricsForContext.length > 0
+          ? metricsForContext.reduce((sum, item) => sum + Math.abs(item.change), 0) / metricsForContext.length
+          : 0;
+
+      return {
+        key: context,
+        label: prettifyContextLabel(context),
+        description: getContextDescription(context, metricsForContext.length),
+        status: getTrendStatus(avgAbsoluteChange),
+        changePercent: avgChange,
+        metricCount: metricsForContext.length,
+      };
+    });
+  }, [contextKeys, metrics]);
+
+  const currentMetrics = activeContext ? metrics[activeContext] || [] : [];
+  const currentNews = activeContext ? news[activeContext] || [] : [];
+  const currentForecasts = activeContext ? forecasts[activeContext] || [] : [];
+  const currentEvents = activeContext ? events[activeContext] || [] : [];
+
+  const marketAlerts = useMemo(() => {
+    const alerts: Array<{ title: string; level: "positive" | "watch" | "update"; message: string }> = [];
+
+    const strongestPositiveMetric = [...currentMetrics]
+      .filter((metric) => metric.change > 0)
+      .sort((a, b) => b.change - a.change)[0];
+
+    if (strongestPositiveMetric) {
+      alerts.push({
+        title: "Positive Signal",
+        level: "positive",
+        message: `${strongestPositiveMetric.name} is trending up (${strongestPositiveMetric.change.toFixed(1)} ${strongestPositiveMetric.unit === "%" ? "pp" : strongestPositiveMetric.unit}).`,
+      });
+    }
+
+    const riskMetric = [...currentMetrics]
+      .filter((metric) => metric.trend === "down" || metric.change < 0)
+      .sort((a, b) => a.change - b.change)[0];
+
+    if (riskMetric) {
+      alerts.push({
+        title: "Watch Signal",
+        level: "watch",
+        message: `${riskMetric.name} is weakening (${riskMetric.change.toFixed(1)} ${riskMetric.unit === "%" ? "pp" : riskMetric.unit}).`,
+      });
+    }
+
+    const latestNews = [...currentNews]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+
+    if (latestNews) {
+      alerts.push({
+        title: "Market Update",
+        level: "update",
+        message: latestNews.title,
+      });
+    }
+
+    return alerts.slice(0, 3);
+  }, [currentMetrics, currentNews]);
+
+  const analysisSummary = useMemo(() => {
+    const avgAbsChange =
+      currentMetrics.length > 0
+        ? currentMetrics.reduce((sum, metric) => sum + Math.abs(metric.change), 0) / currentMetrics.length
+        : 0;
+
+    const avgConfidence =
+      currentForecasts.length > 0
+        ? currentForecasts.reduce((sum, forecast) => sum + forecast.confidence, 0) / currentForecasts.length
+        : 0;
+
+    const highImpactNewsCount = currentNews.filter(
+      (item) => String(item.impact).toLowerCase() === "high" || String(item.impact).toLowerCase() === "negative",
+    ).length;
+
+    const riskAssessment: RiskLevel = avgAbsChange >= 5 ? "High" : avgAbsChange >= 2 ? "Moderate" : "Low";
+    const confidenceLabel = avgConfidence >= 75 ? "High" : avgConfidence >= 55 ? "Medium" : "Low";
+
+    const improvingCount = currentMetrics.filter((metric) => metric.change > 0).length;
+    const weakeningCount = currentMetrics.filter((metric) => metric.change < 0).length;
+
+    const takeaways = [
+      `${improvingCount} indicators are improving while ${weakeningCount} are weakening in the selected context.`,
+      `${currentForecasts.length} forecast models are active with average confidence of ${avgConfidence.toFixed(0)}%.`,
+      `${highImpactNewsCount} high-impact headlines require attention for near-term planning.`,
+    ];
+
+    const outlook =
+      riskAssessment === "High"
+        ? "Market conditions are volatile. Tight monitoring and shorter planning cycles are recommended."
+        : riskAssessment === "Moderate"
+          ? "The market is mixed but manageable. Use scenario-based planning and monitor leading indicators closely."
+          : "The current trend is relatively stable. Continue execution with periodic validation against incoming data.";
+
+    return {
+      takeaways,
+      outlook,
+      riskAssessment,
+      confidenceLabel,
+    };
+  }, [currentMetrics, currentForecasts, currentNews]);
 
   const handleRefresh = async () => {
     await refreshData(activeContext);
-    // Show user feedback
-    setTimeout(() => {
-      alert(ECONOMIC_REFRESH_ALERT);
-    }, 500);
   };
 
-  // Real-time data streaming simulation
-  useEffect(() => {
-    if (!isStreaming) return;
-
-    const streamInterval = setInterval(
-      () => {
-        // Simulate random data updates
-        const randomUpdate =
-          UPDATE_TYPES[Math.floor(Math.random() * UPDATE_TYPES.length)];
-
-        setActiveUpdates((prev) => [...prev, randomUpdate]);
-        setLastDataUpdate(new Date());
-
-        // Clear update indicator after 3 seconds
-        setTimeout(() => {
-          setActiveUpdates((prev) =>
-            prev.filter((update) => update !== randomUpdate),
-          );
-        }, ACTIVE_UPDATE_TIMEOUT);
-      },
-      STREAM_UPDATE_INTERVAL + Math.random() * STREAM_JITTER,
-    );
-
-    return () => clearInterval(streamInterval);
-  }, [isStreaming]);
-
-  const handleContextChange = async (newContext: EconomicContext) => {
-    setActiveContext(newContext);
-    // Fetch fresh data for the new context
-    await refreshData(newContext);
-    setLastDataUpdate(new Date());
-  };
-
-  const getContextTitle = (context: EconomicContext) => {
-    const config = ECONOMIC_CONTEXT_CONFIG.find((c) => c.context === context);
-    return config?.titleBase || "Economic Dashboard";
-  };
-
-  const getContextDescription = (context: EconomicContext) => {
-    const config = ECONOMIC_CONTEXT_CONFIG.find((c) => c.context === context);
-    if (!config) return "";
-    return config.descriptionTemplate.replace("{companyName}", companyName);
-  };
+  const activeContextLabel = activeContext ? prettifyContextLabel(activeContext) : "Economic";
+  const activeContextSummary = contextSummaries.find((ctx) => ctx.key === activeContext);
 
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
         <ModuleHeader
           icon={<Activity className="h-6 w-6" />}
-          title={getContextTitle(activeContext)}
-          description={getContextDescription(activeContext)}
+          title="Economic Indicators"
+          description={`${activeContextSummary?.description || "Key economic indicators and market insights."} for ${companyName}`}
           isConnected={isConnected}
           lastUpdated={lastUpdated}
           onReconnect={reconnect}
           error={error}
-          connectionLabel={isStreaming ? "Live Streaming" : "Live"}
+          connectionLabel="Database"
         />
 
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-          {/* Economic Indicators Note: Index.tsx doesn't have tab navigation like other modules */}
-          {/* Context Switcher */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <ContextSwitcher
               activeContext={activeContext}
-              onContextChange={handleContextChange}
+              onContextChange={setActiveContext}
+              contexts={contextSummaries}
               isLoading={isLoading}
             />
 
             <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
               <Badge
                 variant={isConnected ? "default" : "destructive"}
-                className={cn(
-                  "flex items-center gap-1 transition-all",
-                  isStreaming && "animate-pulse",
-                )}
+                className="flex items-center gap-1"
               >
-                {isConnected ? (
-                  <Wifi
-                    className={cn("h-3 w-3", isStreaming && "animate-bounce")}
-                  />
-                ) : (
-                  <Activity className="h-3 w-3" />
-                )}
-                {isConnected ? "Live Streaming" : "Offline Mode"}
-              </Badge>
-
-              <Badge
-                variant="outline"
-                className={cn(
-                  "flex items-center gap-1 transition-all",
-                  activeUpdates.includes("metrics") &&
-                    "bg-green-100 border-green-300 animate-pulse",
-                )}
-              >
-                <TrendingUp className="h-3 w-3" />
-                {currentMetrics.filter((m) => m.trend === "up").length} Trending
-                Up
-              </Badge>
-
-              <Badge
-                variant="secondary"
-                className={cn(
-                  "flex items-center gap-1",
-                  activeUpdates.length > 0 && "animate-pulse bg-blue-100",
-                )}
-              >
-                <Activity className="h-3 w-3" />
-                {activeUpdates.length} Active Updates
+                {isConnected ? <Wifi className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                {isConnected ? "Database Connected" : "Database Unavailable"}
               </Badge>
 
               <Badge variant="outline" className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
-                Updated {lastDataUpdate.toLocaleTimeString()}
+                Updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}
               </Badge>
 
-              {error && (
-                <Badge
-                  variant="destructive"
-                  className="flex items-center gap-1 animate-pulse"
-                >
-                  <AlertTriangle className="h-3 w-3" />
-                  Connection Issue
-                </Badge>
-              )}
-
               <button
-                onClick={() => setIsStreaming(!isStreaming)}
-                className={cn(
-                  "text-xs px-2 py-1 rounded-md transition-all hover:scale-105",
-                  isStreaming
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200",
-                )}
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border hover:bg-muted"
               >
-                {isStreaming ? "🟢 Streaming" : "⏸️ Paused"}
+                <RefreshCw className="h-3 w-3" />
+                Refresh
               </button>
             </div>
           </div>
 
-          {/* Key Metrics Dashboard - First */}
+          {error && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  Unable to load economic data from Django
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">{error}</CardContent>
+            </Card>
+          )}
+
           <section>
-            <LoadingOverlay
-              isLoading={isLoading}
-              loadingText="Updating metrics..."
-            >
+            <LoadingOverlay isLoading={isLoading} loadingText="Loading metrics from database...">
               <MetricsDashboard metrics={currentMetrics} />
             </LoadingOverlay>
           </section>
 
-          {/* Economic News Table - Second */}
           <section>
-            <LoadingOverlay
-              isLoading={isLoading}
-              loadingText="Fetching latest news..."
-            >
+            <LoadingOverlay isLoading={isLoading} loadingText="Loading news from database...">
               <EconomicTable news={currentNews} />
             </LoadingOverlay>
           </section>
 
-          {/* Economic Forecasts - Third */}
           <section>
-            <LoadingOverlay
-              isLoading={isLoading}
-              loadingText="Calculating forecasts..."
-            >
+            <LoadingOverlay isLoading={isLoading} loadingText="Loading forecasts from database...">
               <ForecastPanel forecasts={currentForecasts} />
             </LoadingOverlay>
           </section>
 
-          {/* Economic Alerts - Fourth */}
           <section>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-economic-warning" />
-                  Market Alerts & Notifications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {MARKET_ALERTS.map((alert, index) => {
-                    const iconMap = {
-                      positive: TrendingUp,
-                      warning: AlertTriangle,
-                      update: BarChart3,
-                    };
-                    const Icon = iconMap[alert.type];
-                    const styles = ALERT_STYLE_MAP[alert.type];
-
-                    return (
-                      <div
-                        key={index}
-                        className={`p-4 rounded-lg border border-${styles.borderColor} bg-${styles.backgroundColor}`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Icon
-                            className={`h-4 w-4 text-${styles.textColor}`}
-                          />
-                          <span
-                            className={`text-sm font-medium text-${styles.textColor}`}
-                          >
-                            {alert.title}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {alert.message}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            <LoadingOverlay isLoading={isLoading} loadingText="Loading events from database...">
+              <UpcomingEvents events={currentEvents} />
+            </LoadingOverlay>
           </section>
 
-          {/* Additional Economic Insights - Fifth */}
           <section>
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Economic Analysis Summary
-                </CardTitle>
+                <CardTitle>Market Alerts & Notifications</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm">Key Takeaways</h4>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      {KEY_TAKEAWAYS.map((takeaway) => (
-                        <li
-                          key={takeaway.id}
-                          className="flex items-start gap-2"
+              <CardContent className="space-y-3">
+                {marketAlerts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No market alerts available from database records for this context.
+                  </p>
+                ) : (
+                  marketAlerts.map((alert, idx) => (
+                    <div key={`${alert.title}-${idx}`} className="rounded-md border p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-sm">{alert.title}</p>
+                        <Badge
+                          variant={
+                            alert.level === "positive"
+                              ? "default"
+                              : alert.level === "watch"
+                                ? "destructive"
+                                : "secondary"
+                          }
                         >
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full bg-${SENTIMENT_COLOR_MAP[takeaway.sentiment]} mt-2 flex-shrink-0`}
-                          />
-                          {takeaway.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm">Outlook</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {ECONOMIC_OUTLOOK.summary}
-                    </p>
-                    <div className="flex gap-2 pt-2">
-                      <Badge variant="outline" className="text-xs">
-                        Risk Assessment: {ECONOMIC_OUTLOOK.riskAssessment}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        Confidence: {ECONOMIC_OUTLOOK.confidence}
-                      </Badge>
+                          {alert.level === "positive"
+                            ? "Positive"
+                            : alert.level === "watch"
+                              ? "Watch"
+                              : "Update"}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">{alert.message}</p>
                     </div>
-                  </div>
-                </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </section>
 
-          {/* Upcoming Economic Events - Sixth */}
           <section>
-            <UpcomingEvents events={currentEvents} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Economic Analysis Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Key Takeaways</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {analysisSummary.takeaways.map((item, idx) => (
+                      <li key={`${item}-${idx}`}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Outlook</h4>
+                  <p className="text-sm text-muted-foreground">{analysisSummary.outlook}</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">Risk Assessment: {analysisSummary.riskAssessment}</Badge>
+                  <Badge variant="outline">Confidence: {analysisSummary.confidenceLabel}</Badge>
+                </div>
+              </CardContent>
+            </Card>
           </section>
         </main>
-
-        {/* Footer */}
-        <footer className="border-t bg-muted/30 mt-12 sm:mt-16">
-          <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                <span>{ECONOMIC_FOOTER.copyright}</span>
-                <span className="hidden sm:inline">•</span>
-                <span>{ECONOMIC_FOOTER.updateFrequency}</span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                <span>Sources: {ECONOMIC_FOOTER.dataSources}</span>
-              </div>
-            </div>
-          </div>
-        </footer>
       </div>
     </TooltipProvider>
   );

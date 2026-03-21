@@ -19,9 +19,16 @@ import { type UpsellOpportunity } from "@/lib/revenue-data";
 
 interface UpsellOpportunitiesProps {
   upsells: UpsellOpportunity[];
+  insights: {
+    highPriorityActions: string[];
+    successFactors: string[];
+  };
 }
 
-export function UpsellOpportunities({ upsells }: UpsellOpportunitiesProps) {
+export function UpsellOpportunities({
+  upsells,
+  insights,
+}: UpsellOpportunitiesProps) {
   const getProbabilityColor = (score: number) => {
     if (score >= 80) return "text-green-600";
     if (score >= 60) return "text-yellow-600";
@@ -245,10 +252,9 @@ export function UpsellOpportunities({ upsells }: UpsellOpportunitiesProps) {
                 High-Priority Actions
               </h4>
               <ul className="space-y-2 text-sm text-blue-700">
-                <li>• Focus on customers with 80%+ probability scores</li>
-                <li>• Prioritize accounts nearing upgrade triggers</li>
-                <li>• Create personalized upgrade presentations</li>
-                <li>• Offer limited-time upgrade incentives</li>
+                {insights.highPriorityActions.map((item, index) => (
+                  <li key={index}>• {item}</li>
+                ))}
               </ul>
             </div>
             <div>
@@ -256,10 +262,9 @@ export function UpsellOpportunities({ upsells }: UpsellOpportunitiesProps) {
                 Success Factors
               </h4>
               <ul className="space-y-2 text-sm text-blue-700">
-                <li>• API usage approaching limits</li>
-                <li>• Multiple team member requests</li>
-                <li>• Strong engagement metrics</li>
-                <li>• Security/compliance requirements</li>
+                {insights.successFactors.map((item, index) => (
+                  <li key={index}>• {item}</li>
+                ))}
               </ul>
             </div>
           </div>

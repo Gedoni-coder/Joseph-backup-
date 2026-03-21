@@ -34,4 +34,48 @@ console.warn = (...args: any[]) => {
   originalWarn.apply(console, args);
 };
 
-createRoot(document.getElementById("root")!).render(<App />);
+/**
+ * Auto-login with test user (development mode only)
+ * This allows the frontend to authenticate without a login UI in dev environment
+ */
+async function initializeAuth() {
+  // Don't auto-login if there's already a valid token in storage
+  const existingToken = localStorage.getItem("authToken");
+  if (existingToken) {
+    return;
+  }
+
+  // In production, this would be skipped entirely
+  if (import.meta.env.PROD) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/auth/login/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "testuser123"
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.authToken) {
+        localStorage.setItem("authToken", data.authToken);
+        console.log("✓ Auto-authenticated with test user");
+      }
+    } else {
+      console.warn("⚠️  Auto-authentication failed. Run: python seed_test_user.py");
+    }
+  } catch (error) {
+    console.error("⚠️  Auto-authentication error:", error);
+  }
+}
+
+// Initialize authentication before rendering
+initializeAuth().then(() => {
+  createRoot(document.getElementById("root")!).render(<App />);
+});
+

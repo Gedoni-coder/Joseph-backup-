@@ -160,6 +160,16 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
     return `${sign}${change.toFixed(1)}${unitSymbol === "%" ? "pp" : ""} (${sign}${changePercent.toFixed(1)}%)`;
   };
 
+  if (metrics.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No economic indicators found in the database for this context.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="relative">
       {/* Navigation Header */}

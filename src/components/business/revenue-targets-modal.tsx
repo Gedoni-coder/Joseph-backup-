@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ export interface RevenueTargets {
 interface RevenueTargetsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (targets: RevenueTargets) => void;
+  onSave: (targets: RevenueTargets) => void | Promise<void>;
   initialTargets?: RevenueTargets;
 }
 
@@ -42,7 +42,21 @@ export function RevenueTargetsModal({
   const [q4Revenue, setQ4Revenue] = useState(initialTargets?.q4Revenue || "");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validateAndSave = () => {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    setAnnualRevenue(initialTargets?.annualRevenue || "");
+    setMonthlyRevenue(initialTargets?.monthlyRevenue || "");
+    setQ1Revenue(initialTargets?.q1Revenue || "");
+    setQ2Revenue(initialTargets?.q2Revenue || "");
+    setQ3Revenue(initialTargets?.q3Revenue || "");
+    setQ4Revenue(initialTargets?.q4Revenue || "");
+    setErrors({});
+  }, [isOpen, initialTargets]);
+
+  const validateAndSave = async () => {
     const newErrors: Record<string, string> = {};
 
     if (!annualRevenue) newErrors.annualRevenue = "Annual revenue is required";
@@ -84,16 +98,21 @@ export function RevenueTargetsModal({
       return;
     }
 
-    onSave({
-      annualRevenue: Number(annualRevenue),
-      monthlyRevenue: Number(monthlyRevenue),
-      q1Revenue: Number(q1Revenue),
-      q2Revenue: Number(q2Revenue),
-      q3Revenue: Number(q3Revenue),
-      q4Revenue: Number(q4Revenue),
-    });
-
-    onClose();
+    try {
+      await onSave({
+        annualRevenue: Number(annualRevenue),
+        monthlyRevenue: Number(monthlyRevenue),
+        q1Revenue: Number(q1Revenue),
+        q2Revenue: Number(q2Revenue),
+        q3Revenue: Number(q3Revenue),
+        q4Revenue: Number(q4Revenue),
+      });
+      onClose();
+    } catch {
+      setErrors({
+        submit: "Failed to save revenue targets. Please try again.",
+      });
+    }
   };
 
   if (!isOpen) return null;
@@ -225,6 +244,15 @@ export function RevenueTargetsModal({
               <p className="text-sm text-red-700 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 {errors.quarterly}
+              </p>
+            </div>
+          )}
+
+          {errors.submit && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {errors.submit}
               </p>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useFinancialAdvisoryAPI } from "../hooks/useFinancialAdvisoryAPI";
 import { useCompanyInfo } from "../lib/company-context";
@@ -24,17 +24,6 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 import { ConnectionStatus } from "../components/ui/connection-status";
-import {
-  DEFAULT_NOTIFICATIONS,
-  DEFAULT_ADVICE,
-  SUMMARY_DESCRIPTION,
-  getSummaryContent,
-  RECOMMENDATION_DESCRIPTION,
-  getRecommendationContent,
-  DEFAULT_ACTION_ITEMS,
-  DEFAULT_NEXT_STEPS,
-  getSummaryMetrics,
-} from "../mocks/financial-advisory";
 import { StrategicBudgeting } from "../components/financial/strategic-budgeting";
 import { CashFlowPlanning } from "../components/financial/cash-flow-planning";
 import { BudgetValidation } from "../components/financial/budget-validation";
@@ -57,6 +46,14 @@ import {
   Activity,
   HelpCircle,
 } from "lucide-react";
+import {
+  getUnreadNotificationCount,
+  listNotifications,
+} from "../lib/api/notification-service";
+import {
+  getUnreadAdviceCount,
+  listAdviceMessages,
+} from "../lib/api/advice-service";
 
 export default function FinancialAdvisory() {
   const { companyInfo } = useCompanyInfo();
@@ -72,6 +69,16 @@ export default function FinancialAdvisory() {
     advisoryInsights,
     budgetAssumptions,
     liquidityMetrics,
+    budgetValidationSummary,
+    forecastValidationRecords,
+    budgetAlignmentMetrics,
+    forecastImprovementAreas,
+    scenarioResilienceMetrics,
+    recommendedStressTests,
+    scenarioSummaryCards,
+    riskSummaryCards,
+    riskCategoryDistributions,
+    riskMitigationStrategies,
     isLoading,
     error,
     lastUpdated,
@@ -88,6 +95,176 @@ export default function FinancialAdvisory() {
   const [activeTab, setActiveTab] = useState("strategic-budgeting");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [ideasOpen, setIdeasOpen] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [unreadAdviceCount, setUnreadAdviceCount] = useState(0);
+  const [apiNotifications, setApiNotifications] = useState<any[]>([]);
+  const [apiAdvice, setApiAdvice] = useState<any[]>([]);
+
+  // Fetch unread counts and messages from backend APIs
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [notifCount, adviceCount, notificationsData, adviceData] = await Promise.all([
+          getUnreadNotificationCount(),
+          getUnreadAdviceCount(),
+          listNotifications(),
+          listAdviceMessages(),
+        ]);
+
+        setUnreadNotificationCount(notifCount);
+        setUnreadAdviceCount(adviceCount);
+        setApiNotifications(notificationsData.slice(0, 5));
+        setApiAdvice(adviceData.slice(0, 5));
+      } catch (error) {
+        console.error("Failed to fetch notification/advice data:", error);
+        // Data remains empty, will show empty state in popover
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  // Helper function to format timestamps as relative time
+  const formatTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const notifications = useMemo(() => {
+    // Only use API notifications - they are the actual notification objects from backend
+    return apiNotifications.map((notif: any) => ({
+      id: notif.id,
+      icon: notif.type === "alert" ? "alert-triangle" 
+        : notif.type === "forecast" ? "trending-up"
+        : notif.type === "market" ? "activity"
+        : "info",
+      type: notif.type || "update",
+      title: notif.subject,
+      message: notif.preview || notif.body,
+      timeAgo: notif.created_at ? formatTime(notif.created_at) : "unknown",
+    }));
+  }, [apiNotifications]);
+
+  const advice = useMemo(() => {
+    // Only use API advice - they are the actual advice messages from backend
+    return apiAdvice.map((adv: any) => ({
+      id: adv.id,
+      icon: adv.moduleIcon || "help-circle",
+      type: adv.moduleIcon === "shield" ? "risk" : "strategic",
+      title: adv.title,
+      message: adv.content,
+    }));
+  }, [apiAdvice]);
+
+  const summaryText = useMemo(() => {
+    const totalImpact = advisoryInsights.reduce(
+      (sum, insight) => sum + insight.financialImpact.estimated,
+      0,
+    );
+    const avgRisk =
+      riskAssessments.length > 0
+        ? riskAssessments.reduce((sum, risk) => sum + risk.riskScore, 0) /
+          riskAssessments.length
+        : 0;
+
+    return `Financial planning is currently tracking ${budgetForecasts.length} forecast periods with ${cashFlowProjections.length} cash flow projection windows. Advisory insights identify an estimated ${new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(totalImpact)} in potential impact. The average risk score is ${avgRisk.toFixed(0)}, and liquidity monitoring is active across ${liquidityMetrics.length} key indicators.`;
+  }, [advisoryInsights, budgetForecasts.length, cashFlowProjections.length, liquidityMetrics.length, riskAssessments]);
+
+  const summaryMetrics = useMemo(() => {
+    const highRiskCount = riskAssessments.filter((risk) => risk.riskScore >= 70).length;
+    const avgConfidence =
+      budgetForecasts.length > 0
+        ? budgetForecasts.reduce((sum, forecast) => sum + forecast.confidence, 0) /
+          budgetForecasts.length
+        : 0;
+
+    return [
+      {
+        index: 1,
+        title: "Forecast Coverage",
+        value: budgetForecasts.length,
+        insight: "Number of forecast windows currently maintained in the system.",
+      },
+      {
+        index: 2,
+        title: "Cash Flow Projections",
+        value: cashFlowProjections.length,
+        insight: "Projection rows sourced directly from API cash flow records.",
+      },
+      {
+        index: 3,
+        title: "Average Forecast Confidence",
+        value: avgConfidence.toFixed(0),
+        unit: "%",
+        insight: "Confidence is computed from recorded forecast variance.",
+      },
+      {
+        index: 4,
+        title: "High-Risk Items",
+        value: highRiskCount,
+        insight: "High-risk count reflects risks with score >= 70.",
+      },
+    ];
+  }, [budgetForecasts, cashFlowProjections.length, riskAssessments]);
+
+  const recommendationText = useMemo(() => {
+    const topInsights = advisoryInsights.slice(0, 3).map((insight) => insight.title);
+    if (topInsights.length === 0) {
+      return "No advisory insights are currently available. Add or sync advisory records to generate recommendation narratives.";
+    }
+    return `Priority recommendations are driven by live advisory records: ${topInsights.join("; ")}. Focus execution on high-priority and risk-management insights first, then align budget assumptions and liquidity actions to these recommendations.`;
+  }, [advisoryInsights]);
+
+  const actionItems = useMemo(() => {
+    return advisoryInsights
+      .flatMap((insight) =>
+        insight.actionItems.slice(0, 2).map((action, index) => ({
+          index: index + 1,
+          title: insight.title,
+          description: action,
+          priority: insight.priority,
+          timeline: insight.financialImpact.timeframe,
+        })),
+      )
+      .slice(0, 6);
+  }, [advisoryInsights]);
+
+  const nextSteps = useMemo(() => {
+    return [
+      {
+        index: 1,
+        step: "Review high-priority advisory insights and assign owners.",
+        owner: "Finance Lead",
+        dueDate: "This week",
+      },
+      {
+        index: 2,
+        step: "Validate updated budget assumptions against latest line items.",
+        owner: "FP&A",
+        dueDate: "Next 7 days",
+      },
+      {
+        index: 3,
+        step: "Re-run scenario tests for top financial risks.",
+        owner: "Risk Manager",
+        dueDate: "Next cycle",
+      },
+    ];
+  }, []);
 
   if (isLoading) {
     return (
@@ -167,7 +344,7 @@ export default function FinancialAdvisory() {
                             variant="destructive"
                             className="absolute -top-2 -right-2 px-1.5 py-0.5 text-xs min-w-5 h-5 flex items-center justify-center rounded-full"
                           >
-                            {DEFAULT_NOTIFICATIONS.length}
+                            {unreadNotificationCount}
                           </Badge>
                         </Button>
                       </PopoverTrigger>
@@ -192,44 +369,55 @@ export default function FinancialAdvisory() {
                         </Button>
                       </div>
                       <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-                        {DEFAULT_NOTIFICATIONS.map((notification) => {
-                          const iconMap = {
-                            calculator: Calculator,
-                            "trending-up": TrendingUp,
-                            target: Target,
-                            lightbulb: Lightbulb,
-                          };
-                          const Icon =
-                            iconMap[notification.icon as keyof typeof iconMap];
-                          const colorMap = {
-                            alert: "text-blue-500",
-                            update: "text-green-500",
-                            insight: "text-orange-500",
-                          };
-                          return (
-                            <div
-                              key={notification.id}
-                              className="p-2 sm:p-3 rounded-lg border bg-card"
-                            >
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <Icon
-                                  className={`h-4 w-4 ${colorMap[notification.type]} mt-0.5 flex-shrink-0`}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs sm:text-sm font-medium line-clamp-2">
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground line-clamp-2">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {notification.timeAgo}
-                                  </p>
+                        {notifications.length > 0 ? (
+                          notifications.map((notification) => {
+                            const iconMap = {
+                              calculator: Calculator,
+                              "alert-triangle": AlertTriangle,
+                              "trending-up": TrendingUp,
+                              target: Target,
+                              lightbulb: Lightbulb,
+                              activity: Activity,
+                            };
+                            const Icon =
+                              iconMap[notification.icon as keyof typeof iconMap];
+                            const colorMap = {
+                              alert: "text-blue-500",
+                              update: "text-green-500",
+                              insight: "text-orange-500",
+                              forecast: "text-purple-500",
+                            };
+                            return (
+                              <div
+                                key={notification.id}
+                                className="p-2 sm:p-3 rounded-lg border bg-card"
+                              >
+                                <div className="flex items-start gap-2 sm:gap-3">
+                                  {Icon && (
+                                    <Icon
+                                      className={`h-4 w-4 ${colorMap[notification.type] || "text-gray-500"} mt-0.5 flex-shrink-0`}
+                                    />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs sm:text-sm font-medium line-clamp-2">
+                                      {notification.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                      {notification.message}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {notification.timeAgo}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        ) : (
+                          <div className="py-6 text-center text-muted-foreground">
+                            <p className="text-sm">No notifications available</p>
+                          </div>
+                        )}
                       </div>
                       <Link to="/notifications">
                         <Button variant="outline" className="w-full" size="sm">
@@ -248,10 +436,18 @@ export default function FinancialAdvisory() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm p-1.5 sm:p-2"
+                          className="flex items-center gap-1 sm:gap-2 relative text-xs sm:text-sm p-1.5 sm:p-2"
                         >
                           <HelpCircle className="h-3.5 sm:h-4 w-3.5 sm:w-4 flex-shrink-0" />
                           <span className="hidden sm:inline">Advice</span>
+                          {unreadAdviceCount > 0 && (
+                            <Badge
+                              variant="destructive"
+                              className="absolute -top-2 -right-2 px-1.5 py-0.5 text-xs min-w-5 h-5 flex items-center justify-center rounded-full"
+                            >
+                              {unreadAdviceCount}
+                            </Badge>
+                          )}
                         </Button>
                       </PopoverTrigger>
                     </TooltipTrigger>
@@ -275,46 +471,54 @@ export default function FinancialAdvisory() {
                         </Button>
                       </div>
                       <div className="space-y-2 sm:space-y-3 max-h-96 overflow-y-auto">
-                        {DEFAULT_ADVICE.map((advice) => {
-                          const iconMap = {
-                            "help-circle": HelpCircle,
-                            target: Target,
-                            shield: Shield,
-                            "trending-up": TrendingUp,
-                          };
-                          const Icon =
-                            iconMap[advice.icon as keyof typeof iconMap];
-                          const colorMap = {
-                            optimization: "text-blue-500",
-                            performance: "text-green-500",
-                            risk: "text-red-500",
-                            strategic: "text-purple-500",
-                          };
-                          return (
-                            <div
-                              key={advice.id}
-                              className="p-2 sm:p-3 rounded-lg border bg-card"
-                            >
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <Icon
-                                  className={`h-4 w-4 ${colorMap[advice.type]} mt-0.5 flex-shrink-0`}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs sm:text-sm font-medium line-clamp-2">
-                                    {advice.title}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground line-clamp-2">
-                                    {advice.message}
-                                  </p>
+                        {advice.length > 0 ? (
+                          advice.map((advice) => {
+                            const iconMap = {
+                              "help-circle": HelpCircle,
+                              target: Target,
+                              shield: Shield,
+                              "trending-up": TrendingUp,
+                            };
+                            const Icon =
+                              iconMap[advice.icon as keyof typeof iconMap];
+                            const colorMap = {
+                              optimization: "text-blue-500",
+                              performance: "text-green-500",
+                              risk: "text-red-500",
+                              strategic: "text-purple-500",
+                            };
+                            return (
+                              <div
+                                key={advice.id}
+                                className="p-2 sm:p-3 rounded-lg border bg-card"
+                              >
+                                <div className="flex items-start gap-2 sm:gap-3">
+                                  {Icon && (
+                                    <Icon
+                                      className={`h-4 w-4 ${colorMap[advice.type] || "text-gray-500"} mt-0.5 flex-shrink-0`}
+                                    />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs sm:text-sm font-medium line-clamp-2">
+                                      {advice.title}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                      {advice.message}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        ) : (
+                          <div className="py-6 text-center text-muted-foreground">
+                            <p className="text-sm">No advice available</p>
+                          </div>
+                        )}
                       </div>
-                      <Link to="/ai-insights">
+                      <Link to="/advice">
                         <Button variant="outline" className="w-full" size="sm">
-                          Get More Advice
+                          View All Advice
                         </Button>
                       </Link>
                     </div>
@@ -445,23 +649,14 @@ export default function FinancialAdvisory() {
             >
               <SummaryRecommendationSection
                 summaryTitle="Financial Advisory Summary"
-                summaryDescription={SUMMARY_DESCRIPTION}
-                summaryText={getSummaryContent(
-                  budgetForecasts.length,
-                  liquidityMetrics.length,
-                  riskAssessments.length,
-                )}
-                summaryMetrics={getSummaryMetrics(
-                  budgetForecasts.length,
-                  cashFlowProjections.length,
-                  scenarioTests.length,
-                  riskAssessments.length,
-                )}
+                summaryDescription="Live summary generated from financial advisory API records."
+                summaryText={summaryText}
+                summaryMetrics={summaryMetrics}
                 recommendationTitle="Financial Advisory Recommendations"
-                recommendationDescription={RECOMMENDATION_DESCRIPTION}
-                recommendationText={getRecommendationContent()}
-                actionItems={DEFAULT_ACTION_ITEMS}
-                nextSteps={DEFAULT_NEXT_STEPS}
+                recommendationDescription="Action plan built from active advisory insights and risk data."
+                recommendationText={recommendationText}
+                actionItems={actionItems}
+                nextSteps={nextSteps}
               />
             </TabsContent>
 
@@ -481,7 +676,12 @@ export default function FinancialAdvisory() {
               value="budget-validation"
               className="space-y-3 sm:space-y-4 md:space-y-6"
             >
-              <BudgetValidation budgetForecasts={budgetForecasts} />
+              <BudgetValidation
+                budgetValidationSummary={budgetValidationSummary}
+                forecastValidationRecords={forecastValidationRecords}
+                budgetAlignmentMetrics={budgetAlignmentMetrics}
+                forecastImprovementAreas={forecastImprovementAreas}
+              />
             </TabsContent>
 
             <TabsContent
@@ -490,6 +690,9 @@ export default function FinancialAdvisory() {
             >
               <ScenarioTesting
                 scenarioTests={scenarioTests}
+                scenarioResilienceMetrics={scenarioResilienceMetrics}
+                recommendedStressTests={recommendedStressTests}
+                scenarioSummaryCards={scenarioSummaryCards}
                 onRunScenario={runScenarioTest}
               />
             </TabsContent>
@@ -500,6 +703,9 @@ export default function FinancialAdvisory() {
             >
               <RiskAssessmentComponent
                 riskAssessments={riskAssessments}
+                riskSummaryCards={riskSummaryCards}
+                riskCategoryDistributions={riskCategoryDistributions}
+                riskMitigationStrategies={riskMitigationStrategies}
                 onUpdateRiskStatus={updateRiskStatus}
                 onAddRisk={addRisk}
               />

@@ -10,6 +10,11 @@ export default function SignUp() {
   const navigate = useNavigate();
   const { signup, error, isLoading, clearError, isAuthenticated } = useAuth();
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    navigate("/home", { replace: true });
+  }, [isAuthenticated, navigate]);
+
   const [fullName, setFullName] = React.useState("");
   const [email, setEmail] = React.useState(() => {
     try {
@@ -36,8 +41,7 @@ export default function SignUp() {
 
     try {
       await signup(email, password, fullName);
-      // Navigate to onboarding after successful signup
-      navigate("/onboarding", { replace: true });
+      // Redirect is handled by auth effect based on profile state.
     } catch (err) {
       setLocalError(error || "Signup failed. Please try again.");
     }

@@ -13,3 +13,5 @@ from . import policy
 from . import inventory
 from . import chatbot
 from . import company
+from . import advice
+from . import notifications

@@ -30,19 +30,19 @@ import {
 } from "lucide-react";
 
 interface InsightsReportPanelProps {
+  isOpen: boolean;
   report: GeneratedInsightReport | null;
   onClose: () => void;
 }
 
 export function InsightsReportPanel({
+  isOpen,
   report,
   onClose,
 }: InsightsReportPanelProps) {
   const [activeSection, setActiveSection] = useState("summary");
 
   if (!report) return null;
-
-  const isOpen = report !== null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -393,7 +393,7 @@ export function InsightsReportPanel({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Strategic Advisory Report</DialogTitle>

@@ -1,12 +1,5 @@
-import { useRevenueStrategyAPI } from "./useRevenueStrategyAPI";
+import { useQuery } from "@tanstack/react-query";
 import {
-  revenueStreams as mockStreams,
-  revenueScenarios as mockScenarios,
-  churnAnalysis as mockChurn,
-  upsellOpportunities as mockUpsells,
-  revenueMetrics as mockMetrics,
-  discountAnalysis as mockDiscounts,
-  channelPerformance as mockChannels,
   type RevenueStream,
   type RevenueScenario,
   type ChurnAnalysis,
@@ -15,6 +8,14 @@ import {
   type DiscountAnalysis,
   type ChannelPerformance,
 } from "@/lib/revenue-data";
+import {
+  getRevenueOverviewMetrics,
+  getRevenueOverviewTopStreams,
+  getRevenueOverviewChurnRisks,
+  getRevenueOverviewUpsellOpportunities,
+  getRevenueOverviewChannelPerformances,
+  getRevenueUpsellInsights,
+} from "@/lib/api/revenue-strategy-service";
 
 export interface UseRevenueDataReturn {
   streams: RevenueStream[];
@@ -24,6 +25,10 @@ export interface UseRevenueDataReturn {
   metrics: RevenueMetric[];
   discounts: DiscountAnalysis[];
   channels: ChannelPerformance[];
+  upsellInsights: {
+    highPriorityActions: string[];
+    successFactors: string[];
+  };
   isLoading: boolean;
   isConnected: boolean;
   lastUpdated: Date;
@@ -36,126 +41,135 @@ export interface UseRevenueDataReturn {
  * This allows existing components to work with real API data without refactoring
  */
 export function useRevenueDataAPI(): UseRevenueDataReturn {
-  const {
-    monthlyRecurringRevenue,
-    annualContractValue,
-    customerLifetimeValue,
-    revenuePerCustomer,
-    netRevenueRetention,
-    streams: apiStreams,
-    churnAnalysis: apiChurn,
-    upsellOpportunities: apiUpsells,
-    isLoading,
-    error,
-    isConnected,
-    lastUpdated,
-    refreshData,
-    reconnect,
-  } = useRevenueStrategyAPI();
+  const overviewMetricsQuery = useQuery({
+    queryKey: ["revenue", "overview-metrics"],
+    queryFn: getRevenueOverviewMetrics,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  // Use API data if available, fall back to mock
-  const streams: RevenueStream[] =
-    apiStreams.length > 0
-      ? apiStreams.map((stream, idx) => ({
-          id: String(idx + 1),
-          name: stream,
-          currentRevenue: monthlyRecurringRevenue * (0.3 + idx * 0.2),
-          projectedRevenue: monthlyRecurringRevenue * (0.35 + idx * 0.25),
-          growth: 15 + idx * 5,
-          margin: 60 + idx * 5,
-        }))
-      : mockStreams;
+  const topStreamsQuery = useQuery({
+    queryKey: ["revenue", "overview-top-streams"],
+    queryFn: getRevenueOverviewTopStreams,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const scenarios: RevenueScenario[] =
-    annualContractValue > 0
-      ? [
-          {
-            id: "1",
-            name: "Conservative",
-            yearlyRevenue: annualContractValue * 0.8,
-            churnRate: 8,
-            probability: 25,
-          },
-          {
-            id: "2",
-            name: "Base Case",
-            yearlyRevenue: annualContractValue,
-            churnRate: 5,
-            probability: 50,
-          },
-          {
-            id: "3",
-            name: "Optimistic",
-            yearlyRevenue: annualContractValue * 1.2,
-            churnRate: 3,
-            probability: 25,
-          },
-        ]
-      : mockScenarios;
+  const churnRisksQuery = useQuery({
+    queryKey: ["revenue", "overview-churn-risks"],
+    queryFn: getRevenueOverviewChurnRisks,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const churn: ChurnAnalysis[] =
-    apiChurn.length > 0
-      ? apiChurn.map((c, idx) => ({
-          id: String(idx + 1),
-          segment: `Segment ${idx + 1}`,
-          churnRate: 5 + idx * 2,
-          atRiskCustomers: Math.round(customerLifetimeValue / 10000 + idx * 10),
-          retentionScore: 85 - idx * 5,
-        }))
-      : mockChurn;
+  const upsellsQuery = useQuery({
+    queryKey: ["revenue", "overview-upsell-opportunities"],
+    queryFn: getRevenueOverviewUpsellOpportunities,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const upsells: UpsellOpportunity[] =
-    apiUpsells.length > 0
-      ? apiUpsells.map((u, idx) => ({
-          id: String(idx + 1),
-          product: u,
-          targetCustomers: Math.round(customerLifetimeValue / 5000 + idx * 20),
-          averageValue: revenuePerCustomer * 0.3,
-          conversionRate: 30 + idx * 5,
-          potentialRevenue: revenuePerCustomer * 0.3 * (30 + idx * 5) / 100,
-        }))
-      : mockUpsells;
+  const channelsQuery = useQuery({
+    queryKey: ["revenue", "overview-channel-performances"],
+    queryFn: getRevenueOverviewChannelPerformances,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const upsellInsightsQuery = useQuery({
+    queryKey: ["revenue", "upsell-insights"],
+    queryFn: getRevenueUpsellInsights,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const metrics: RevenueMetric[] =
-    monthlyRecurringRevenue > 0
-      ? [
-          {
-            id: "1",
-            metric: "Monthly Recurring Revenue",
-            value: monthlyRecurringRevenue,
-            unit: "USD",
-            trend: "up",
-            target: monthlyRecurringRevenue * 1.2,
-          },
-          {
-            id: "2",
-            metric: "Annual Contract Value",
-            value: annualContractValue,
-            unit: "USD",
-            trend: "up",
-            target: annualContractValue * 1.15,
-          },
-          {
-            id: "3",
-            metric: "Customer Lifetime Value",
-            value: customerLifetimeValue,
-            unit: "USD",
-            trend: "up",
-            target: customerLifetimeValue * 1.25,
-          },
-          {
-            id: "4",
-            metric: "Net Revenue Retention",
-            value: netRevenueRetention,
-            unit: "%",
-            trend: "stable",
-            target: 120,
-          },
-        ]
-      : mockMetrics;
+    overviewMetricsQuery.data?.map((metric) => ({
+      id: String(metric.id),
+      name: metric.name,
+      value: metric.value,
+      unit: metric.unit === "USD" ? "$" : metric.unit,
+      change: metric.change_percent,
+      trend: metric.trend,
+      period: metric.period_label,
+    })) ?? [];
 
-  const discounts: DiscountAnalysis[] = mockDiscounts;
-  const channels: ChannelPerformance[] = mockChannels;
+  const streams: RevenueStream[] =
+    topStreamsQuery.data?.map((stream) => ({
+      id: String(stream.id),
+      name: stream.name,
+      type: stream.stream_type,
+      currentRevenue: stream.revenue,
+      forecastRevenue: stream.revenue,
+      growth: stream.growth_percent,
+      margin: 0,
+      customers: 0,
+      avgRevenuePerCustomer: 0,
+    })) ?? [];
+
+  const churn: ChurnAnalysis[] =
+    churnRisksQuery.data?.map((risk) => ({
+      id: String(risk.id),
+      segment: risk.segment,
+      churnRate: risk.churn_rate,
+      customers: risk.customers,
+      revenueAtRisk: risk.revenue_at_risk,
+      averageLifetime: 0,
+      retentionCost: 0,
+      churnReasons: [],
+    })) ?? [];
+
+  const upsells: UpsellOpportunity[] =
+    upsellsQuery.data?.map((upsell) => ({
+      id: String(upsell.id),
+      customer: upsell.customer_name,
+      currentPlan: upsell.current_plan,
+      suggestedPlan: upsell.suggested_plan,
+      currentMRR: upsell.current_mrr,
+      potentialMRR: upsell.potential_increase,
+      probabilityScore: upsell.likelihood_percent,
+      timeToUpgrade: upsell.time_to_upgrade_days,
+      triggers: Array.isArray(upsell.triggers) ? upsell.triggers : [],
+    })) ?? [];
+
+  const upsellInsights = {
+    highPriorityActions:
+      upsellInsightsQuery.data
+        ?.filter((item) => item.category === "high-priority")
+        .map((item) => item.text) ?? [],
+    successFactors:
+      upsellInsightsQuery.data
+        ?.filter((item) => item.category === "success-factor")
+        .map((item) => item.text) ?? [],
+  };
+
+  const channels: ChannelPerformance[] =
+    channelsQuery.data?.map((channel) => ({
+      id: String(channel.id),
+      channel: channel.channel,
+      revenue: channel.revenue,
+      customers: channel.customers,
+      avgOrderValue: 0,
+      acquisitionCost: 0,
+      profitability: channel.margin_percent,
+      growth: 0,
+    })) ?? [];
+
+  const scenarios: RevenueScenario[] = [];
+  const discounts: DiscountAnalysis[] = [];
+
+  const isLoading =
+    overviewMetricsQuery.isLoading ||
+    topStreamsQuery.isLoading ||
+    churnRisksQuery.isLoading ||
+    upsellsQuery.isLoading ||
+    channelsQuery.isLoading ||
+    upsellInsightsQuery.isLoading;
+
+  const firstError =
+    overviewMetricsQuery.error ||
+    topStreamsQuery.error ||
+    churnRisksQuery.error ||
+    upsellsQuery.error ||
+    channelsQuery.error ||
+    upsellInsightsQuery.error;
+
+  const error = firstError ? (firstError as Error).message : null;
+  const isConnected = !error;
 
   return {
     streams,
@@ -165,10 +179,18 @@ export function useRevenueDataAPI(): UseRevenueDataReturn {
     metrics,
     discounts,
     channels,
+    upsellInsights,
     isLoading,
     isConnected,
-    lastUpdated,
+    lastUpdated: new Date(),
     error,
-    refreshData,
+    refreshData: () => {
+      overviewMetricsQuery.refetch();
+      topStreamsQuery.refetch();
+      churnRisksQuery.refetch();
+      upsellsQuery.refetch();
+      channelsQuery.refetch();
+      upsellInsightsQuery.refetch();
+    },
   };
 }

@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { ScenarioTest } from "../../lib/financial-advisory-data";
+import {
+  RecommendedStressTest,
+  ScenarioResilienceMetric,
+  ScenarioSummaryCard,
+  ScenarioTest,
+} from "../../lib/financial-advisory-data";
 import {
   Card,
   CardContent,
@@ -9,7 +14,6 @@ import {
 } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
   Select,
   SelectContent,
@@ -29,11 +33,17 @@ import {
 
 interface ScenarioTestingProps {
   scenarioTests: ScenarioTest[];
+  scenarioResilienceMetrics: ScenarioResilienceMetric[];
+  recommendedStressTests: RecommendedStressTest[];
+  scenarioSummaryCards: ScenarioSummaryCard[];
   onRunScenario: (scenario: Omit<ScenarioTest, "id" | "createdAt">) => void;
 }
 
 export function ScenarioTesting({
   scenarioTests,
+  scenarioResilienceMetrics,
+  recommendedStressTests,
+  scenarioSummaryCards,
   onRunScenario,
 }: ScenarioTestingProps) {
   const [selectedType, setSelectedType] = useState("all");
@@ -98,8 +108,12 @@ export function ScenarioTesting({
     return true;
   });
 
-  const handleRunScenario = () => {
-    const changeValue = parseInt(changePercent);
+  const createScenario = (
+    variable: string,
+    percentChange: number,
+    type: "stress" | "sensitivity" | "monte_carlo",
+  ): Omit<ScenarioTest, "id" | "createdAt"> => {
+    const changeValue = percentChange;
 
     // Base financial values
     const baseRevenue = 2500000;
@@ -114,7 +128,7 @@ export function ScenarioTesting({
     let resultingNetIncome: number;
     let cashFlowImpact: number;
 
-    switch (testVariable) {
+    switch (variable) {
       case "Revenue":
         baseValue = baseRevenue;
         testValue = baseRevenue * (1 + changeValue / 100);
@@ -181,19 +195,19 @@ export function ScenarioTesting({
     }
 
     // Calculate probability based on magnitude (extreme changes are less likely)
-    const probabilityBaseline = testType === "stress" ? 30 : 50;
+    const probabilityBaseline = type === "stress" ? 30 : 50;
     const probability = Math.max(
       5,
       probabilityBaseline - Math.abs(changeValue) * 0.5,
     );
 
-    const newScenario = {
-      name: `${testVariable} ${changePercent}% Scenario (${testType})`,
-      description: `${Math.abs(changeValue)}% ${changeValue > 0 ? "increase" : "decrease"} in ${testVariable.toLowerCase()} using ${testType} testing methodology`,
-      type: testType,
+    return {
+      name: `${variable} ${changeValue >= 0 ? "+" : ""}${changeValue}% Scenario (${type})`,
+      description: `${Math.abs(changeValue)}% ${changeValue > 0 ? "increase" : "decrease"} in ${variable.toLowerCase()} using ${type} testing methodology`,
+      type,
       parameters: [
         {
-          variable: testVariable,
+          variable,
           baseValue,
           testValue,
           changePercent: changeValue,
@@ -208,8 +222,49 @@ export function ScenarioTesting({
       },
       probability: Math.round(probability),
     };
+  };
 
-    onRunScenario(newScenario);
+  const handleRunScenario = () => {
+    const scenario = createScenario(testVariable, parseInt(changePercent, 10), testType);
+    onRunScenario(scenario);
+  };
+
+  const handleRunTemplateScenario = (template: RecommendedStressTest["scenarioTemplate"]) => {
+    const scenario = createScenario(
+      template.testVariable ?? testVariable,
+      template.changePercent ?? parseInt(changePercent, 10),
+      template.testType ?? testType,
+    );
+    onRunScenario(scenario);
+  };
+
+  const summaryCardMap = scenarioSummaryCards.reduce(
+    (acc, card) => {
+      acc[card.key] = card;
+      return acc;
+    },
+    {} as Record<ScenarioSummaryCard["key"], ScenarioSummaryCard>,
+  );
+
+  const getValueToneColor = (tone: string) => {
+    switch (tone) {
+      case "danger":
+      case "red":
+        return "text-red-600";
+      case "warning":
+      case "yellow":
+        return "text-yellow-600";
+      case "success":
+      case "green":
+        return "text-green-600";
+      case "info":
+      case "blue":
+        return "text-blue-600";
+      case "orange":
+        return "text-orange-600";
+      default:
+        return "text-gray-600";
+    }
   };
 
   return (
@@ -292,7 +347,9 @@ export function ScenarioTesting({
               </label>
               <Select
                 value={testType}
-                onValueChange={(value: any) => setTestType(value)}
+                onValueChange={(value) =>
+                  setTestType(value as "stress" | "sensitivity")
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -327,7 +384,7 @@ export function ScenarioTesting({
                   Total Scenarios
                 </p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {filteredScenarios.length}
+                  {summaryCardMap.total_scenarios?.value ?? "0"}
                 </p>
               </div>
               <Calculator className="h-8 w-8 text-blue-600" />
@@ -343,11 +400,7 @@ export function ScenarioTesting({
                   Critical Scenarios
                 </p>
                 <p className="text-2xl font-bold text-red-600">
-                  {
-                    filteredScenarios.filter(
-                      (s) => s.results.impactSeverity === "critical",
-                    ).length
-                  }
+                  {summaryCardMap.critical_scenarios?.value ?? "0"}
                 </p>
               </div>
               <TrendingDown className="h-8 w-8 text-red-600" />
@@ -363,13 +416,7 @@ export function ScenarioTesting({
                   Avg Probability
                 </p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {(
-                    filteredScenarios.reduce(
-                      (sum, s) => sum + s.probability,
-                      0,
-                    ) / filteredScenarios.length
-                  ).toFixed(0)}
-                  %
+                  {summaryCardMap.average_probability?.value ?? "0%"}
                 </p>
               </div>
               <BarChart3 className="h-8 w-8 text-purple-600" />
@@ -384,7 +431,9 @@ export function ScenarioTesting({
                 <p className="text-sm font-medium text-gray-600">
                   Resilience Score
                 </p>
-                <p className="text-2xl font-bold text-green-600">74</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {summaryCardMap.resilience_score?.value ?? "0"}
+                </p>
               </div>
               <ShieldAlert className="h-8 w-8 text-green-600" />
             </div>
@@ -525,45 +574,19 @@ export function ScenarioTesting({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-900">
-                    Revenue Decline Tolerance
-                  </span>
-                  <span className="text-sm font-medium text-red-600">-25%</span>
+              {scenarioResilienceMetrics.map((metric) => (
+                <div key={metric.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-900">{metric.name}</span>
+                    <span
+                      className={`text-sm font-medium ${getValueToneColor(metric.valueTone)}`}
+                    >
+                      {metric.value}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">{metric.description}</p>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Business remains profitable with up to 25% revenue decline
-                </p>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-900">
-                    Cost Inflation Buffer
-                  </span>
-                  <span className="text-sm font-medium text-yellow-600">
-                    +15%
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Can absorb up to 15% increase in operating costs
-                </p>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-900">
-                    Cash Flow Stress Point
-                  </span>
-                  <span className="text-sm font-medium text-orange-600">
-                    6 months
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Liquidity sufficient for 6 months under stress conditions
-                </p>
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -577,50 +600,30 @@ export function ScenarioTesting({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <span className="font-medium text-gray-900">
-                    Supply Chain Disruption
-                  </span>
+              {recommendedStressTests.map((test) => (
+                <div key={test.id} className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {test.icon === "alert-triangle" && (
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    )}
+                    {test.icon === "trending-down" && (
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                    )}
+                    {test.icon === "activity" && (
+                      <Activity className="h-4 w-4 text-blue-600" />
+                    )}
+                    <span className="font-medium text-gray-900">{test.title}</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{test.description}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleRunTemplateScenario(test.scenarioTemplate)}
+                  >
+                    Run Test
+                  </Button>
                 </div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Test 20-30% increase in material costs
-                </p>
-                <Button size="sm" variant="outline">
-                  Run Test
-                </Button>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                  <span className="font-medium text-gray-900">
-                    Economic Recession
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Model 40% demand reduction scenario
-                </p>
-                <Button size="sm" variant="outline">
-                  Run Test
-                </Button>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium text-gray-900">
-                    Interest Rate Shock
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Analyze 300 basis point rate increase
-                </p>
-                <Button size="sm" variant="outline">
-                  Run Test
-                </Button>
-              </div>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -1,64 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { EconomicContext } from "@/lib/economic-data";
 import { Globe, MapPin, Building2, Flag, Zap, TrendingUp } from "lucide-react";
 import { useState } from "react";
 
 interface ContextSwitcherProps {
-  activeContext: EconomicContext;
-  onContextChange: (context: EconomicContext) => void;
+  activeContext: string;
+  onContextChange: (context: string) => void;
+  contexts: ContextSummary[];
   isLoading?: boolean;
 }
 
-interface ContextData {
+interface ContextSummary {
+  key: string;
   label: string;
-  icon: any;
   description: string;
   status: "stable" | "volatile" | "trending";
   changePercent: number;
+  metricCount: number;
 }
 
-const contextConfig: Record<EconomicContext, ContextData> = {
-  local: {
-    label: "Local",
-    icon: MapPin,
-    description: "City & Regional",
-    status: "stable",
-    changePercent: 2.1,
-  },
-  state: {
-    label: "State",
-    icon: Building2,
-    description: "State Level",
-    status: "trending",
-    changePercent: 5.7,
-  },
-  national: {
-    label: "National",
-    icon: Flag,
-    description: "United States",
-    status: "volatile",
-    changePercent: -1.2,
-  },
-  international: {
-    label: "International",
-    icon: Globe,
-    description: "Global Markets",
-    status: "trending",
-    changePercent: 8.3,
-  },
-} as const;
+const pickIcon = (contextKey: string) => {
+  const key = contextKey.toLowerCase();
+  if (key.includes("local") || key.includes("city") || key.includes("region")) return MapPin;
+  if (key.includes("state")) return Building2;
+  if (key.includes("national") || key === "us" || key.includes("country")) return Flag;
+  return Globe;
+};
 
 export function ContextSwitcher({
   activeContext,
   onContextChange,
+  contexts,
   isLoading = false,
 }: ContextSwitcherProps) {
-  const [hoveredContext, setHoveredContext] = useState<EconomicContext | null>(null);
+  const [hoveredContext, setHoveredContext] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const handleContextChange = async (context: EconomicContext) => {
+  const handleContextChange = async (context: string) => {
     if (context === activeContext || isTransitioning) return;
 
     setIsTransitioning(true);
@@ -68,7 +47,7 @@ export function ContextSwitcher({
     }, 150);
   };
 
-  const getStatusColor = (status: ContextData["status"]) => {
+  const getStatusColor = (status: ContextSummary["status"]) => {
     switch (status) {
       case "stable": return "bg-green-500";
       case "volatile": return "bg-red-500";
@@ -77,7 +56,7 @@ export function ContextSwitcher({
     }
   };
 
-  const getStatusText = (status: ContextData["status"]) => {
+  const getStatusText = (status: ContextSummary["status"]) => {
     switch (status) {
       case "stable": return "Stable";
       case "volatile": return "Volatile";
@@ -87,20 +66,19 @@ export function ContextSwitcher({
   };
   return (
     <div className="flex flex-wrap gap-3 p-2 bg-muted/50 rounded-xl backdrop-blur-sm border">
-      {(Object.keys(contextConfig) as EconomicContext[]).map((context) => {
-        const config = contextConfig[context];
-        const Icon = config.icon;
-        const isActive = activeContext === context;
-        const isHovered = hoveredContext === context;
+      {contexts.map((context) => {
+        const Icon = pickIcon(context.key);
+        const isActive = activeContext === context.key;
+        const isHovered = hoveredContext === context.key;
 
         return (
           <Button
-            key={context}
+            key={context.key}
             variant={isActive ? "default" : "ghost"}
             size="sm"
             disabled={isLoading || isTransitioning}
-            onClick={() => handleContextChange(context)}
-            onMouseEnter={() => setHoveredContext(context)}
+            onClick={() => handleContextChange(context.key)}
+            onMouseEnter={() => setHoveredContext(context.key)}
             onMouseLeave={() => setHoveredContext(null)}
             className={cn(
               "relative flex items-center gap-3 px-4 py-3 text-sm font-medium",
@@ -133,7 +111,7 @@ export function ContextSwitcher({
                 {/* Status indicator */}
                 <div className={cn(
                   "absolute -top-1 -right-1 w-2 h-2 rounded-full",
-                  getStatusColor(config.status),
+                  getStatusColor(context.status),
                   isActive && "animate-pulse"
                 )} />
               </div>
@@ -144,7 +122,7 @@ export function ContextSwitcher({
                     "font-medium transition-colors",
                     isActive && "text-primary"
                   )}>
-                    {config.label}
+                    {context.label}
                   </span>
 
                   {isActive && (
@@ -157,20 +135,23 @@ export function ContextSwitcher({
 
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-muted-foreground hidden sm:block">
-                    {config.description}
+                    {context.description}
                   </span>
 
                   {/* Change indicator */}
                   <div className={cn(
                     "hidden md:flex items-center gap-1 text-xs",
-                    config.changePercent > 0 ? "text-green-600" : "text-red-600"
+                    context.changePercent > 0 ? "text-green-600" : "text-red-600"
                   )}>
                     <TrendingUp className={cn(
                       "h-3 w-3",
-                      config.changePercent < 0 && "rotate-180"
+                      context.changePercent < 0 && "rotate-180"
                     )} />
-                    {Math.abs(config.changePercent)}%
+                    {Math.abs(context.changePercent).toFixed(1)}%
                   </div>
+                  <Badge variant="outline" className="hidden md:inline-flex text-[10px]">
+                    {context.metricCount} metrics
+                  </Badge>
                 </div>
               </div>
             </div>

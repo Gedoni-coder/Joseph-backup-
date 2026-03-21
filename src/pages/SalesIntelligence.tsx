@@ -1439,9 +1439,6 @@ const SalesIntelligence = () => {
   // Performance metrics with calculated values (TAGS HARDCODED, VALUES CALCULATED)
   const performanceMetrics = [
     {
-      label: "Total Pipeline Value",
-      value: format(2400000),
-      change: "+12%",
       label: "Total Pipeline Value", // TAG: Hardcoded
       value: `$${(calculatePipelineValue() / 1000000).toFixed(2)}M`, // VALUE: Calculated
       change: "+12%", // TODO: Calculate change from previous period
@@ -1454,9 +1451,6 @@ const SalesIntelligence = () => {
       color: "text-blue-600",
     },
     {
-      label: "Avg Deal Size",
-      value: format(45200),
-      change: "+8%",
       label: "Avg Deal Size", // TAG: Hardcoded
       value: `$${(calculateAvgDealSize() / 1000).toFixed(1)}K`, // VALUE: Calculated
       change: "+8%", // TODO: Calculate change from previous period

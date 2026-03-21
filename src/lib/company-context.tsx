@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useCallback,
 } from "react";
 import {
   getCompanyProfiles,
@@ -10,6 +11,7 @@ import {
   updateCompanyProfile,
   CompanyProfile,
 } from "./api/company-service";
+import { useAuth } from "./auth-context";
 
 export interface CompanyInfo {
   // Required fields
@@ -110,47 +112,56 @@ export function CompanyInfoProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [backendProfileId, setBackendProfileId] = useState<number | null>(null);
 
-  // Load from backend on mount, fallback to localStorage
-  useEffect(() => {
-    async function loadCompanyInfo() {
-      try {
-        // Try to load from backend
-        const profiles = await getCompanyProfiles();
-        console.log("Company profiles from API:", profiles);
-        if (profiles && profiles.length > 0) {
-          const profile = profiles[0];
-          setBackendProfileId(profile.id!);
-          const frontendFormat = toFrontendFormat(profile);
-          setCompanyInfo(frontendFormat);
-          // Also save to localStorage as backup
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(frontendFormat));
-          setIsLoading(false);
-          return;
-        }
-        console.log("No profiles found in backend");
-      } catch (error) {
-        console.log("Error loading company profile, trying localStorage:", error);
-      }
-
-      // Fallback to localStorage
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          setCompanyInfo(JSON.parse(saved));
-        }
-      } catch (error) {
-        console.error("Failed to load company info from storage:", error);
-      }
-      
+  const loadCompanyInfo = useCallback(async () => {
+    if (!isAuthenticated) {
+      setCompanyInfo(null);
+      setBackendProfileId(null);
       setIsLoading(false);
+      return;
     }
 
-    loadCompanyInfo();
-  }, []);
+    setIsLoading(true);
+
+    try {
+      // Try to load from backend first (source of truth)
+      const profiles = await getCompanyProfiles();
+      if (profiles && profiles.length > 0) {
+        const profile = profiles[0];
+        setBackendProfileId(profile.id!);
+        const frontendFormat = toFrontendFormat(profile);
+        setCompanyInfo(frontendFormat);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(frontendFormat));
+        setIsLoading(false);
+        return;
+      }
+    } catch {
+      // Fallback to local storage if backend profile fetch fails
+    }
+
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        setCompanyInfo(JSON.parse(saved));
+      } else {
+        setCompanyInfo(null);
+      }
+    } catch {
+      setCompanyInfo(null);
+    }
+
+    setIsLoading(false);
+  }, [isAuthenticated]);
+
+  // Reload company info after auth state settles (login/logout/signup/checkAuth)
+  useEffect(() => {
+    if (isAuthLoading) return;
+    void loadCompanyInfo();
+  }, [isAuthLoading, loadCompanyInfo]);
 
   const updateCompanyInfo = async (info: Partial<CompanyInfo>) => {
     const updated = { ...(companyInfo || ({} as CompanyInfo)), ...info };

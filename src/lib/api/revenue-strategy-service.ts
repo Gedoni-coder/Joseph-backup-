@@ -1,95 +1,96 @@
-/**
- * Revenue Strategy Service
- * Connected to Django REST API
- */
+import { apiClient } from "./api-client";
 
-import { djangoGet, djangoPost, djangoPatch, djangoDelete } from "./django-client";
+type Paginated<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
 
-export interface RevenueStrategyData {
+function unwrapList<T>(payload: T[] | Paginated<T>): T[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  return payload.results ?? [];
+}
+
+async function getList<T>(url: string): Promise<T[]> {
+  const response = await apiClient.get<T[] | Paginated<T>>(url);
+  return unwrapList(response.data);
+}
+
+export interface RevenueOverviewMetricApi {
   id: number;
-  created_at: string;
-  account_id: number;
-  monthly_recurring_revenue: number;
-  annual_contract_value: number;
-  customer_lifetime_value: number;
-  revenue_per_customer: number;
-  gross_revenue_retention: number;
-  net_revenue_retention: number;
-  top_revenue_streams: string[];
-  churn_risk_summary: string[];
-  top_upsell_opportunities: string[];
-  channel_performance: string[];
-  revenue_strategy_summary: string;
-  key_metrics_insights: string[];
-  revenue_strategy_recommendations: string[];
-  action_items: string[];
-  next_steps: string[];
-  revenue_streams_details: string[];
-  revenue_forecasting: string[];
-  churn_analysis: string[];
-  upsell_opportunities: string[];
+  name: string;
+  value: number;
+  unit: "USD" | "%";
+  change_percent: number;
+  trend: "up" | "down" | "stable";
+  period_label: string;
+  sort_order: number;
 }
 
-export type RevenueStrategyCreateData = Omit<RevenueStrategyData, "id" | "created_at">;
-export type RevenueStrategyUpdateData = Partial<RevenueStrategyCreateData>;
-
-/**
- * Get all revenue strategies
- */
-export async function getRevenueStrategies(): Promise<RevenueStrategyData[]> {
-  try {
-    return await djangoGet<RevenueStrategyData[]>("/api/revenue/streams/");
-  } catch (error) {
-    console.error("[Django API] Error fetching revenue strategies:", error);
-    return [];
-  }
+export interface RevenueOverviewTopStreamApi {
+  id: number;
+  name: string;
+  stream_type: "subscription" | "one-time" | "usage-based" | "commission" | "advertising";
+  revenue: number;
+  growth_percent: number;
+  sort_order: number;
 }
 
-/**
- * Get a specific revenue strategy by ID
- */
-export async function getRevenueStrategy(id: number): Promise<RevenueStrategyData | null> {
-  try {
-    return await djangoGet<RevenueStrategyData>(`/api/revenue/streams/${id}/`);
-  } catch (error) {
-    console.error(`[Django API] Error fetching revenue strategy ${id}:`, error);
-    return null;
-  }
+export interface RevenueOverviewChurnRiskApi {
+  id: number;
+  segment: string;
+  customers: number;
+  churn_rate: number;
+  revenue_at_risk: number;
+  sort_order: number;
 }
 
-/**
- * Create a new revenue strategy
- */
-export async function createRevenueStrategy(data: RevenueStrategyCreateData): Promise<RevenueStrategyData | null> {
-  try {
-    return await djangoPost<RevenueStrategyData>("/api/revenue/streams/", data);
-  } catch (error) {
-    console.error("[Django API] Error creating revenue strategy:", error);
-    return null;
-  }
+export interface RevenueOverviewUpsellOpportunityApi {
+  id: number;
+  customer_name: string;
+  current_plan: string;
+  suggested_plan: string;
+  current_mrr: number;
+  potential_increase: number;
+  likelihood_percent: number;
+  time_to_upgrade_days: number;
+  triggers: string[];
+  sort_order: number;
 }
 
-/**
- * Update an existing revenue strategy
- */
-export async function updateRevenueStrategy(id: number, data: RevenueStrategyUpdateData): Promise<RevenueStrategyData | null> {
-  try {
-    return await djangoPatch<RevenueStrategyData>(`/api/revenue/streams/${id}/`, data);
-  } catch (error) {
-    console.error(`[Django API] Error updating revenue strategy ${id}:`, error);
-    return null;
-  }
+export interface RevenueUpsellInsightApi {
+  id: number;
+  category: "high-priority" | "success-factor";
+  text: string;
+  sort_order: number;
 }
 
-/**
- * Delete a revenue strategy
- */
-export async function deleteRevenueStrategy(id: number): Promise<boolean> {
-  try {
-    await djangoDelete(`/api/revenue/streams/${id}/`);
-    return true;
-  } catch (error) {
-    console.error(`[Django API] Error deleting revenue strategy ${id}:`, error);
-    return false;
-  }
+export interface RevenueOverviewChannelPerformanceApi {
+  id: number;
+  channel: string;
+  customers: number;
+  revenue: number;
+  margin_percent: number;
+  sort_order: number;
 }
+
+export const getRevenueOverviewMetrics = () =>
+  getList<RevenueOverviewMetricApi>("/api/revenue/overview-metrics/");
+
+export const getRevenueOverviewTopStreams = () =>
+  getList<RevenueOverviewTopStreamApi>("/api/revenue/overview-top-streams/");
+
+export const getRevenueOverviewChurnRisks = () =>
+  getList<RevenueOverviewChurnRiskApi>("/api/revenue/overview-churn-risks/");
+
+export const getRevenueOverviewUpsellOpportunities = () =>
+  getList<RevenueOverviewUpsellOpportunityApi>("/api/revenue/overview-upsell-opportunities/");
+
+export const getRevenueUpsellInsights = () =>
+  getList<RevenueUpsellInsightApi>("/api/revenue/upsell-insights/");
+
+export const getRevenueOverviewChannelPerformances = () =>
+  getList<RevenueOverviewChannelPerformanceApi>("/api/revenue/overview-channel-performances/");

@@ -8,15 +8,6 @@
  * modifying component code.
  */
 
-export const BUSINESS_FORECAST_DEFAULTS = {
-  /**
-   * Annual revenue target - primary business goal
-   * This is a default value that should come from actual business data
-   */
-  ANNUAL_REVENUE_TARGET: "$13.7M",
-  ANNUAL_REVENUE_TARGET_VALUE: 13700000,
-};
-
 /**
  * Summary section content template
  * Uses template literals with placeholders for dynamic data
@@ -29,8 +20,9 @@ export const getSummaryContent = (
   customerCount: number,
   scenarioCount: number,
   kpiCount: number,
+  annualRevenueTargetLabel: string,
 ) => `1. REVENUE OVERVIEW
-Current annual revenue target is set at ${BUSINESS_FORECAST_DEFAULTS.ANNUAL_REVENUE_TARGET} with ${customerCount} distinct customer segments identified. The forecast includes ${scenarioCount} scenario models to cover conservative, base, and aggressive growth cases.
+Current annual revenue target is set at ${annualRevenueTargetLabel} with ${customerCount} distinct customer segments identified. The forecast includes ${scenarioCount} scenario models to cover conservative, base, and aggressive growth cases.
 
 2. CUSTOMER BASE
 The business operates across multiple customer segments with varying demand patterns. Average order values and segment preferences have been analyzed to inform revenue projections and marketing strategies.
@@ -182,11 +174,12 @@ export const getSummaryMetrics = (
   customerCount: number,
   kpiCount: number,
   scenarioCount: number,
+  annualRevenueTargetLabel: string,
 ) => [
   {
     index: 1,
     title: "Annual Revenue Target",
-    value: BUSINESS_FORECAST_DEFAULTS.ANNUAL_REVENUE_TARGET,
+    value: annualRevenueTargetLabel,
     insight: "Primary revenue goal for fiscal year",
   },
   {

@@ -355,7 +355,7 @@ export function CashFlowPlanning({
                   Total Cash Outflows
                 </p>
                 <p className="text-2xl font-bold text-red-600">
-                  {formatCurrency(totalOutflows)}
+                  {formatCurrency(-totalOutflows)}
                 </p>
               </div>
               <ArrowDownCircle className="h-8 w-8 text-red-600" />
@@ -526,7 +526,7 @@ export function CashFlowPlanning({
                         {formatCurrency(totalInflow)}
                       </td>
                       <td className="text-right py-3 px-4 font-medium text-red-600">
-                        {formatCurrency(totalOutflow)}
+                        {formatCurrency(-totalOutflow)}
                       </td>
                       <td className="text-right py-3 px-4 font-medium">
                         <span
@@ -662,7 +662,7 @@ export function CashFlowPlanning({
                         {formatCurrency(totalInflow)}
                       </td>
                       <td className="text-right py-3 px-4 font-medium text-red-600">
-                        {formatCurrency(totalOutflow)}
+                        {formatCurrency(-totalOutflow)}
                       </td>
                       <td className="text-right py-3 px-4 font-medium">
                         <span
@@ -778,7 +778,7 @@ export function CashFlowPlanning({
                         Operating Expenses
                       </span>
                       <span className="font-medium text-red-600">
-                        {formatCurrency(projection.outflows.operatingExpenses)}
+                        {formatCurrency(-projection.outflows.operatingExpenses)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -786,7 +786,7 @@ export function CashFlowPlanning({
                         Accounts Payable
                       </span>
                       <span className="font-medium text-red-600">
-                        {formatCurrency(projection.outflows.accountsPayable)}
+                        {formatCurrency(-projection.outflows.accountsPayable)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -794,7 +794,7 @@ export function CashFlowPlanning({
                         Capital Expenditure
                       </span>
                       <span className="font-medium text-red-600">
-                        {formatCurrency(projection.outflows.capitalExpenditure)}
+                        {formatCurrency(-projection.outflows.capitalExpenditure)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -802,7 +802,7 @@ export function CashFlowPlanning({
                         Debt Service
                       </span>
                       <span className="font-medium text-red-600">
-                        {formatCurrency(projection.outflows.debtService)}
+                        {formatCurrency(-projection.outflows.debtService)}
                       </span>
                     </div>
                   </div>

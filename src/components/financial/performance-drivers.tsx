@@ -173,6 +173,75 @@ export function PerformanceDrivers({
     {} as Record<string, { total: number; onTarget: number }>,
   );
 
+  const alignedKpiCount = performanceDrivers.filter(
+    (driver) => driver.linkedBudgetItems.length > 0,
+  ).length;
+  const budgetAlignmentPercent =
+    performanceDrivers.length > 0
+      ? Math.round((alignedKpiCount / performanceDrivers.length) * 100)
+      : 0;
+
+  const revenueDrivers = performanceDrivers.filter(
+    (driver) => driver.category === "revenue",
+  );
+  const costDrivers = performanceDrivers.filter((driver) => driver.category === "cost");
+  const efficiencyDrivers = performanceDrivers.filter(
+    (driver) => driver.category === "efficiency" || driver.category === "operational",
+  );
+
+  const averagePerformance = (drivers: PerformanceDriver[]): number => {
+    if (!drivers.length) return 0;
+    return (
+      drivers.reduce((sum, driver) => {
+        if (driver.targetValue === 0) return sum;
+        return sum + (driver.currentValue / driver.targetValue) * 100;
+      }, 0) / drivers.length
+    );
+  };
+
+  const revenuePerformance = averagePerformance(revenueDrivers);
+  const costPerformance = averagePerformance(costDrivers);
+  const efficiencyPerformance = averagePerformance(efficiencyDrivers);
+
+  const performanceInsightCards = [
+    {
+      title: "Revenue Performance",
+      description:
+        revenueDrivers.length > 0
+          ? `Revenue KPIs are tracking at ${revenuePerformance.toFixed(0)}% of target across ${revenueDrivers.length} drivers.`
+          : "No revenue KPIs available. Add revenue drivers to track sales performance.",
+      icon: TrendingUp,
+      iconClass: "text-green-600",
+    },
+    {
+      title: "Cost Efficiency",
+      description:
+        costDrivers.length > 0
+          ? `Cost KPIs are currently at ${costPerformance.toFixed(0)}% of target across ${costDrivers.length} tracked drivers.`
+          : "No cost KPIs available. Add cost drivers to monitor efficiency gains.",
+      icon: Target,
+      iconClass: "text-blue-600",
+    },
+    {
+      title: "Operational Excellence",
+      description:
+        efficiencyDrivers.length > 0
+          ? `Efficiency and operational KPIs are tracking at ${efficiencyPerformance.toFixed(0)}% of target.`
+          : "No operational/efficiency KPIs available to evaluate execution health.",
+      icon: Zap,
+      iconClass: "text-purple-600",
+    },
+    {
+      title: "Budget Alignment",
+      description:
+        budgets.length > 0
+          ? `${budgetAlignmentPercent}% of KPIs are aligned to budget-linked items across ${budgets.length} forecast periods.`
+          : `${budgetAlignmentPercent}% of KPIs are aligned to budget-linked items. Add budget forecasts for period-level alignment context.`,
+      icon: BarChart3,
+      iconClass: "text-orange-600",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -545,64 +614,20 @@ export function PerformanceDrivers({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="border rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <TrendingUp className="h-5 w-5 text-green-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      Strong Revenue Performance
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      Revenue KPIs are outperforming targets by an average of
-                      12%
-                    </p>
+              {performanceInsightCards.map((insight) => {
+                const Icon = insight.icon;
+                return (
+                  <div key={insight.title} className="border rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Icon className={`h-5 w-5 mt-0.5 ${insight.iconClass}`} />
+                      <div>
+                        <h4 className="font-medium text-gray-900">{insight.title}</h4>
+                        <p className="text-sm text-gray-600">{insight.description}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Target className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      Cost Efficiency Gains
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      Customer acquisition cost down 13% while maintaining
-                      quality
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Zap className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      Operational Excellence
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      Focus on efficiency metrics showing consistent improvement
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <BarChart3 className="h-5 w-5 text-orange-600 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-gray-900">
-                      Budget Alignment
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      92% of KPIs are aligned with budget assumptions and
-                      forecasts
-                    </p>
-                  </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

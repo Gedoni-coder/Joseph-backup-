@@ -47,6 +47,16 @@ export function ForecastPanel({
     return value.toLocaleString();
   };
 
+  if (forecasts.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No economic forecasts found in the database for this context.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

@@ -67,6 +67,11 @@ export function AdvisoryInsights({
   const [generatedReport, setGeneratedReport] = useState<GeneratedInsightReport | null>(null);
   const [showReportPanel, setShowReportPanel] = useState(false);
 
+  const handleCloseReportPanel = () => {
+    setShowReportPanel(false);
+    setGeneratedReport(null);
+  };
+
   const handleGenerateInsights = async () => {
     setIsGenerating(true);
 
@@ -206,7 +211,11 @@ export function AdvisoryInsights({
   return (
     <TooltipProvider>
       <InsightsLoadingDialog isOpen={isGenerating} />
-      <InsightsReportPanel report={generatedReport} onClose={() => setShowReportPanel(false)} />
+      <InsightsReportPanel
+        isOpen={showReportPanel}
+        report={generatedReport}
+        onClose={handleCloseReportPanel}
+      />
 
       <div className="space-y-6">
         {/* Header */}

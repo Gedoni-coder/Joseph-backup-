@@ -59,7 +59,6 @@ export function ChatbotContainer({
     clearChat,
   } = useChatbot();
 
-  console.log("ChatbotContainer: isOpen =", isOpen);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activePanel, setActivePanel] = useState<"chat" | "tools" | "agent">(
@@ -98,7 +97,6 @@ export function ChatbotContainer({
 
   // Log when floating button is clicked
   const handleOpenClick = () => {
-    console.log("Floating chatbot button clicked");
     setIsOpen(true);
   };
 
@@ -191,14 +189,12 @@ export function ChatbotContainer({
 
   // Function to cycle through size modes
   const cycleSizeMode = () => {
-    console.log("Current size mode:", sizeMode, "Cycling to next...");
     const nextMode =
       sizeMode === "half"
         ? "fullscreen"
         : sizeMode === "fullscreen"
           ? "minimized"
           : "half";
-    console.log("Setting new size mode:", nextMode);
     setSizeMode(nextMode);
   };
 

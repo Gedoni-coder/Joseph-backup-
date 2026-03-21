@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { RiskAssessment } from "../../lib/financial-advisory-data";
+import {
+  RiskAssessment,
+  RiskCategoryDistribution,
+  RiskMitigationStrategy,
+  RiskSummaryCard,
+} from "../../lib/financial-advisory-data";
 import {
   Card,
   CardContent,
@@ -36,12 +41,18 @@ import {
 
 interface RiskAssessmentProps {
   riskAssessments: RiskAssessment[];
+  riskSummaryCards: RiskSummaryCard[];
+  riskCategoryDistributions: RiskCategoryDistribution[];
+  riskMitigationStrategies: RiskMitigationStrategy[];
   onUpdateRiskStatus: (id: string, status: RiskAssessment["status"]) => void;
   onAddRisk: (risk: Omit<RiskAssessment, "id" | "lastReviewed">) => void;
 }
 
 export function RiskAssessmentComponent({
   riskAssessments,
+  riskSummaryCards,
+  riskCategoryDistributions,
+  riskMitigationStrategies,
   onUpdateRiskStatus,
   onAddRisk,
 }: RiskAssessmentProps) {
@@ -160,17 +171,18 @@ export function RiskAssessmentComponent({
     }
   };
 
-  const riskDistribution = riskAssessments.reduce(
-    (acc, risk) => {
-      acc[risk.category] = (acc[risk.category] || 0) + 1;
+  const summaryCardMap = riskSummaryCards.reduce(
+    (acc, card) => {
+      acc[card.key] = card.value;
       return acc;
     },
-    {} as Record<string, number>,
+    {} as Record<RiskSummaryCard["key"], string>,
   );
 
-  const averageRiskScore =
-    riskAssessments.reduce((sum, risk) => sum + risk.riskScore, 0) /
-    riskAssessments.length;
+  const totalDistributionCount = riskCategoryDistributions.reduce(
+    (sum, row) => sum + row.count,
+    0,
+  );
 
   return (
     <div className="space-y-6">
@@ -448,7 +460,7 @@ export function RiskAssessmentComponent({
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Risks</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {filteredRisks.length}
+                  {summaryCardMap.total_risks ?? "0"}
                 </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-blue-600" />
@@ -464,7 +476,7 @@ export function RiskAssessmentComponent({
                   High Risk Items
                 </p>
                 <p className="text-2xl font-bold text-red-600">
-                  {filteredRisks.filter((r) => r.riskScore >= 70).length}
+                  {summaryCardMap.high_risk_items ?? "0"}
                 </p>
               </div>
               <XCircle className="h-8 w-8 text-red-600" />
@@ -480,7 +492,7 @@ export function RiskAssessmentComponent({
                   Avg Risk Score
                 </p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {averageRiskScore.toFixed(0)}
+                  {summaryCardMap.average_risk_score ?? "0"}
                 </p>
               </div>
               <BarChart3 className="h-8 w-8 text-purple-600" />
@@ -496,10 +508,7 @@ export function RiskAssessmentComponent({
                   Resolved Risks
                 </p>
                 <p className="text-2xl font-bold text-green-600">
-                  {
-                    riskAssessments.filter((r) => r.status === "resolved")
-                      .length
-                  }
+                  {summaryCardMap.resolved_risks ?? "0"}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -655,9 +664,9 @@ export function RiskAssessmentComponent({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(riskDistribution).map(([category, count]) => (
+              {riskCategoryDistributions.map(({ id, category, count }) => (
                 <div
-                  key={category}
+                  key={id}
                   className="flex justify-between items-center"
                 >
                   <div className="flex items-center gap-2">
@@ -667,7 +676,11 @@ export function RiskAssessmentComponent({
                   <div className="flex items-center gap-3">
                     <div className="w-24">
                       <Progress
-                        value={(count / riskAssessments.length) * 100}
+                        value={
+                          totalDistributionCount > 0
+                            ? (count / totalDistributionCount) * 100
+                            : 0
+                        }
                         className="h-2"
                       />
                     </div>
@@ -688,10 +701,7 @@ export function RiskAssessmentComponent({
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {filteredRisks
-                .filter((risk) => risk.riskScore >= 40)
-                .slice(0, 4)
-                .map((risk) => (
+              {riskMitigationStrategies.map((risk) => (
                   <div key={risk.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-gray-900">
@@ -719,7 +729,7 @@ export function RiskAssessmentComponent({
                     <div className="mt-3 text-xs text-gray-500">
                       Last reviewed:{" "}
                       {risk.lastReviewed
-                        ? new Date(risk.lastReviewed).toLocaleDateString()
+                        ? new Date(risk.lastReviewed).toLocaleDateString("en-GB")
                         : "N/A"}
                     </div>
                   </div>

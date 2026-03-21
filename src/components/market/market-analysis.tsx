@@ -24,7 +24,7 @@ import {
   type MarketTrend,
   type DemandForecast,
   type IndustryInsight,
-} from "@/lib/market-data";
+} from "@/hooks/useMarketDataAPI";
 
 interface MarketAnalysisProps {
   marketSizes: MarketSize[];
@@ -33,7 +33,7 @@ interface MarketAnalysisProps {
   demandForecasts: DemandForecast[];
   industryInsights: IndustryInsight[];
   isDataAvailable?: boolean;
-  dataSource?: "ai-generated" | "onboarding" | "business-forecast" | "placeholder";
+  dataSource?: "ai-generated" | "onboarding" | "business-forecast" | "placeholder" | "database";
 }
 
 export function MarketAnalysis({
@@ -45,14 +45,35 @@ export function MarketAnalysis({
   isDataAvailable = true,
   dataSource = "placeholder",
 }: MarketAnalysisProps) {
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000000) {
-      return `$${(amount / 1000000000).toFixed(1)}B`;
+  const asArray = <T,>(value: T[] | undefined | null): T[] =>
+    Array.isArray(value) ? value : [];
+
+  const toValidNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
+
+  const formatNumber = (value: unknown, fallback = "N/A") => {
+    const validValue = toValidNumber(value);
+    return validValue === null ? fallback : validValue.toLocaleString();
+  };
+
+  const formatFixed = (value: unknown, digits = 1, fallback = "N/A") => {
+    const validValue = toValidNumber(value);
+    return validValue === null ? fallback : validValue.toFixed(digits);
+  };
+
+  const formatCurrency = (amount: unknown) => {
+    const validAmount = toValidNumber(amount);
+    if (validAmount === null) {
+      return "N/A";
     }
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
+
+    if (validAmount >= 1000000000) {
+      return `$${(validAmount / 1000000000).toFixed(1)}B`;
     }
-    return `$${amount.toLocaleString()}`;
+    if (validAmount >= 1000000) {
+      return `$${(validAmount / 1000000).toFixed(1)}M`;
+    }
+    return `$${validAmount.toLocaleString()}`;
   };
 
   const getTrendColor = (direction: string, impact: string) => {
@@ -130,7 +151,7 @@ export function MarketAnalysis({
               <div className="flex-1">
                 <p className="font-semibold text-blue-900">Market Analysis - Enhanced View Available</p>
                 <p className="text-sm text-blue-800 mt-1">
-                  AI Agent integration will provide deeper market insights and TAM analysis. Current view based on {dataSource === "business-forecast" ? "business forecasting data" : dataSource === "onboarding" ? "onboarding information" : "placeholder data"}.
+                  AI Agent integration will provide deeper market insights and TAM analysis. Current view based on {dataSource === "database" ? "database records" : dataSource === "business-forecast" ? "business forecasting data" : dataSource === "onboarding" ? "onboarding information" : "placeholder data"}.
                 </p>
               </div>
             </div>
@@ -186,7 +207,7 @@ export function MarketAnalysis({
                     <span className="text-sm text-gray-600">Growth Rate</span>
                     <div className="flex items-center space-x-2">
                       <span className="text-lg font-bold text-green-600">
-                        {market.growthRate.toFixed(1)}%
+                        {formatFixed(market.growthRate)}%
                       </span>
                       <TrendingUp className="w-4 h-4 text-green-600" />
                     </div>
@@ -216,7 +237,7 @@ export function MarketAnalysis({
                   </Badge>
                 </div>
                 <CardDescription>
-                  {segment.size.toLocaleString()} customers •{" "}
+                  {formatNumber(segment.size)} customers •{" "}
                   {segment.percentage}% of market
                 </CardDescription>
               </CardHeader>
@@ -232,7 +253,7 @@ export function MarketAnalysis({
                     <div className="text-sm text-gray-600">Growth Rate</div>
                     <div className="flex items-center space-x-1">
                       <span className="text-lg font-bold text-green-600">
-                        {segment.growthRate.toFixed(1)}%
+                        {formatFixed(segment.growthRate)}%
                       </span>
                       <TrendingUp className="w-3 h-3 text-green-600" />
                     </div>
@@ -244,7 +265,7 @@ export function MarketAnalysis({
                     Key Characteristics
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {segment.characteristics.map((char, index) => (
+                    {asArray(segment.characteristics).map((char, index) => (
                       <Badge key={index} variant="outline" className="text-xs">
                         {char}
                       </Badge>
@@ -285,15 +306,17 @@ export function MarketAnalysis({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Confidence Level</span>
-                    <span className="font-medium">{trend.confidence}%</span>
+                    <span className="font-medium">
+                      {typeof trend.confidence === "number" ? `${trend.confidence}%` : "-"}
+                    </span>
                   </div>
-                  <Progress value={trend.confidence} className="h-2" />
+                  <Progress value={typeof trend.confidence === "number" ? trend.confidence : 0} className="h-2" />
                 </div>
 
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Sources</div>
                   <div className="flex flex-wrap gap-1">
-                    {trend.sources.map((source, index) => (
+                    {asArray(trend.sources).map((source, index) => (
                       <Badge key={index} variant="outline" className="text-xs">
                         {source}
                       </Badge>
@@ -314,13 +337,13 @@ export function MarketAnalysis({
           <Card key={forecast.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{forecast.product}</CardTitle>
+                <CardTitle className="text-lg">{forecast.segment}</CardTitle>
                 <Badge variant="outline">
-                  {forecast.confidence}% confidence
+                  {toValidNumber(forecast.confidence) ?? 0}% confidence
                 </Badge>
               </div>
               <CardDescription>
-                {forecast.methodology} • {forecast.timeframe}
+                {forecast.assumptions} • {forecast.period}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -328,38 +351,45 @@ export function MarketAnalysis({
                 <div className="text-center">
                   <div className="text-sm text-gray-600">Current Demand</div>
                   <div className="text-2xl font-bold">
-                    {forecast.currentDemand.toLocaleString()}
+                    {formatNumber(forecast.currentDemand)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-gray-600">Forecast Demand</div>
                   <div className="text-2xl font-bold text-blue-600">
-                    {forecast.forecastDemand.toLocaleString()}
+                    {formatNumber(forecast.forecastDemand)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-gray-600">Growth</div>
                   <div className="text-2xl font-bold text-green-600">
-                    {(
-                      ((forecast.forecastDemand - forecast.currentDemand) /
-                        forecast.currentDemand) *
-                      100
-                    ).toFixed(1)}
-                    %
+                    {(() => {
+                      const currentDemand = toValidNumber(forecast.currentDemand);
+                      const projectedDemand = toValidNumber(forecast.forecastDemand);
+                      if (
+                        currentDemand === null ||
+                        projectedDemand === null ||
+                        currentDemand === 0
+                      ) {
+                        return "N/A";
+                      }
+
+                      return `${(((projectedDemand - currentDemand) / currentDemand) * 100).toFixed(1)}%`;
+                    })()}
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <h4 className="font-medium text-gray-900">Key Factors</h4>
-                {forecast.factors.map((factor, index) => (
+                {asArray(forecast.factors).map((factor, index) => (
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-700">{factor.name}</span>
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">
-                          {factor.impact > 0 ? "+" : ""}
-                          {factor.impact.toFixed(1)}%
+                          {toValidNumber(factor.impact) !== null && factor.impact > 0 ? "+" : ""}
+                          {formatFixed(factor.impact)}%
                         </span>
                         <span className="text-xs text-gray-500">
                           (weight: {Math.round(factor.weight * 100)}%)
@@ -375,14 +405,14 @@ export function MarketAnalysis({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {forecast.scenarios.map((scenario, index) => (
+                {asArray(forecast.scenarios).map((scenario, index) => (
                   <div
                     key={index}
                     className="p-3 bg-gray-50 rounded-lg text-center"
                   >
                     <div className="font-medium">{scenario.name}</div>
                     <div className="text-lg font-bold text-blue-600">
-                      {scenario.demand.toLocaleString()}
+                      {formatNumber(scenario.demand)}
                     </div>
                     <div className="text-sm text-gray-600">
                       {scenario.probability}% probability
@@ -444,9 +474,11 @@ export function MarketAnalysis({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Probability</span>
-                    <span className="font-medium">{insight.probability}%</span>
+                    <span className="font-medium">
+                      {typeof insight.probability === "number" ? `${insight.probability}%` : "-"}
+                    </span>
                   </div>
-                  <Progress value={insight.probability} className="h-2" />
+                  <Progress value={typeof insight.probability === "number" ? insight.probability : 0} className="h-2" />
                 </div>
 
                 <div>
@@ -454,7 +486,7 @@ export function MarketAnalysis({
                     Action Items
                   </div>
                   <ul className="text-sm text-gray-700 space-y-1">
-                    {insight.actionItems.map((item, index) => (
+                    {asArray(insight.actionItems).map((item, index) => (
                       <li key={index} className="flex items-start">
                         <span className="mr-2">•</span>
                         {item}
