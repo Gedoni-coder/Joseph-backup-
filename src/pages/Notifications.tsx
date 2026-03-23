@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,15 +25,40 @@ import {
   CheckCircle,
   User,
   Calendar,
+  Loader2,
 } from "lucide-react";
-import { MOCK_NOTIFICATIONS } from "@/mocks/notifications";
+import {
+  listNotifications,
+  markNotificationAsRead,
+  toggleNotificationStarred,
+  toggleNotificationArchived,
+} from "@/lib/api/notification-service";
+import type { Notification } from "@/lib/api/notification-service";
 
 const Notifications = () => {
   const [selectedCategory, setSelectedCategory] = useState("inbox");
-  const [selectedNotification, setSelectedNotification] = useState(null);
-  const [selectedMessages, setSelectedMessages] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const notifications = MOCK_NOTIFICATIONS;
+  // Fetch notifications from backend on component mount
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        setIsLoading(true);
+        const data = await listNotifications();
+        setNotifications(data);
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error);
+        setNotifications([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
 
   const categories = [
     {
@@ -94,6 +119,20 @@ const Notifications = () => {
     }
   };
 
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
   const filteredNotifications = notifications.filter((notification) => {
     switch (selectedCategory) {
       case "starred":
@@ -107,7 +146,7 @@ const Notifications = () => {
     }
   });
 
-  const toggleMessageSelection = (messageId: number) => {
+  const toggleMessageSelection = (messageId: string) => {
     setSelectedMessages((prev) =>
       prev.includes(messageId)
         ? prev.filter((id) => id !== messageId)
@@ -191,7 +230,7 @@ const Notifications = () => {
                       <span className="hidden sm:inline">•</span>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        <span>{notification?.timestamp}</span>
+                          <span>{notification ? formatTime(notification.timestamp) : ""}</span>
                       </div>
                     </div>
                   </div>
@@ -372,57 +411,85 @@ const Notifications = () => {
               </CardHeader>
 
               <CardContent className="p-0">
-                <div className="divide-y">
-                  {filteredNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
-                        !notification.read
-                          ? "bg-blue-50 border-l-4 border-l-blue-500"
-                          : ""
-                      }`}
-                      onClick={() => setSelectedNotification(notification.id)}
-                    >
-                      {/* Checkbox row */}
-                      <div className="flex items-center gap-2 sm:gap-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMessageSelection(notification.id);
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
-                        >
-                          {selectedMessages.includes(notification.id) ? (
-                            <CheckSquare className="h-4 w-4" />
-                          ) : (
-                            <Square className="h-4 w-4" />
-                          )}
-                        </button>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Toggle starred
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded flex-shrink-0 hidden sm:block"
-                        >
-                          <Star
-                            className={`h-4 w-4 ${notification.starred ? "fill-yellow-400 text-yellow-400" : ""}`}
-                          />
-                        </button>
-
-                        <div className="flex-shrink-0 hidden sm:block">
-                          {getTypeIcon(notification.type)}
-                        </div>
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                          <span
-                            className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"}`}
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+                    <p className="text-gray-600 font-medium">Loading notifications...</p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {filteredNotifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                          !notification.read
+                            ? "bg-blue-50 border-l-4 border-l-blue-500"
+                            : ""
+                        }`}
+                        onClick={async () => {
+                          try {
+                            await markNotificationAsRead(notification.id);
+                            setSelectedNotification(notification.id);
+                            // Update local state
+                            setNotifications((prev) =>
+                              prev.map((n) =>
+                                n.id === notification.id ? { ...n, read: true } : n
+                              )
+                            );
+                          } catch (error) {
+                            console.error("Failed to mark notification as read:", error);
+                            setSelectedNotification(notification.id);
+                          }
+                        }}
+                      >
+                        {/* Checkbox row */}
+                        <div className="flex items-center gap-2 sm:gap-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleMessageSelection(notification.id);
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
                           >
-                            {notification.sender}
+                            {selectedMessages.includes(notification.id) ? (
+                              <CheckSquare className="h-4 w-4" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleNotificationStarred(notification.id).then((updated) => {
+                                setNotifications((prev) =>
+                                  prev.map((n) =>
+                                    n.id === notification.id
+                                      ? { ...n, starred: updated.starred }
+                                      : n
+                                  )
+                                );
+                              });
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0 hidden sm:block"
+                          >
+                            <Star
+                              className={`h-4 w-4 ${notification.starred ? "fill-yellow-400 text-yellow-400" : ""}`}
+                            />
+                          </button>
+
+                          <div className="flex-shrink-0 hidden sm:block">
+                            {getTypeIcon(notification.type)}
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
+                            <span
+                              className={`text-sm ${!notification.read ? "font-semibold" : "font-medium"}`}
+                            >
+                              {notification.sender}
                           </span>
                           <div className="flex items-center gap-1 flex-wrap">
                             {getPriorityBadge(notification.priority)}
@@ -444,7 +511,7 @@ const Notifications = () => {
                       {/* Timestamp and menu */}
                       <div className="flex-shrink-0 flex items-center justify-between sm:flex-col sm:text-right gap-2">
                         <div className="text-xs text-muted-foreground sm:mb-1">
-                          {notification.timestamp}
+                          {formatTime(notification.timestamp)}
                         </div>
                         <Button
                           variant="ghost"
@@ -457,6 +524,7 @@ const Notifications = () => {
                     </div>
                   ))}
                 </div>
+                )}
 
                 {filteredNotifications.length === 0 && (
                   <div className="text-center py-12">

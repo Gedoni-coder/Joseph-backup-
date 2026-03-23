@@ -7,7 +7,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 # Import routers from each module
-from api.urls import economic, business, market, loan, revenue, financial, pricing, tax, policy, inventory, chatbot, company
+from api.urls import economic, business, market, loan, revenue, financial, pricing, tax, policy, inventory, chatbot, company, advice, notifications
 
 # Import auth views
 from api.auth_views import signup, login_view, logout_view, get_user
@@ -51,11 +51,17 @@ urlpatterns = [
     # Inventory endpoints
     path('api/inventory/', include(inventory.router.urls)),
     
-    # Chatbot endpoints
-    path('chatbot/', include(chatbot.router.urls)),
+    # Chatbot endpoints (router URLs + custom function paths like /module-chat/)
+    path('chatbot/', include(chatbot.urlpatterns)),
     
     # Company endpoints
     path('api/company/', include(company.router.urls)),
+    
+    # Advice Hub endpoints
+    path('api/advice/', include(advice.router.urls)),
+    
+    # Notifications endpoints
+    path('api/notifications/', include(notifications.router.urls)),
 ]
 
 if settings.DEBUG:

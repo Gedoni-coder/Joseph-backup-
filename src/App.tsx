@@ -56,6 +56,7 @@ import DocumentManager from "./pages/DocumentManager";
 import GrowthPlanning from "./pages/GrowthPlanning";
 import AllReports from "./pages/AllReports";
 import Notifications from "./pages/Notifications";
+import Advice from "./pages/Advice";
 import PolicyAlerts from "./pages/PolicyAlerts";
 import StrategyBuilder from "./pages/StrategyBuilder";
 import RiskManagement from "./pages/RiskManagement";
@@ -99,6 +100,7 @@ import SalesIntelligence from "./pages/SalesIntelligence";
 import ChatbotTest from "./pages/ChatbotTest";
 import { useCompanyInfo } from "./lib/company-context";
 import { AuthProvider } from "./lib/auth-context";
+import { useAuth } from "./lib/auth-context";
 import { useSyncCurrency } from "./hooks/useSyncCurrency";
 
 const queryClient = new QueryClient();
@@ -329,13 +331,49 @@ function TopUtilityBar({
 }
 
 function ProtectedHomeRoute() {
-  const { isSetup } = useCompanyInfo();
+  const { isSetup, isLoading: isCompanyLoading } = useCompanyInfo();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  if (isAuthLoading || isCompanyLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Loading account...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!isSetup) {
     return <Navigate to="/onboarding" replace />;
   }
 
   return <Landing />;
+}
+
+function OnboardingRoute() {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isSetup, isLoading: isCompanyLoading } = useCompanyInfo();
+
+  if (isAuthLoading || isCompanyLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Loading account...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/signup" replace />;
+  }
+
+  if (isSetup) {
+    return <Navigate to="/home" replace />;
+  }
+
+  return <Onboarding />;
 }
 
 function AppContent() {
@@ -369,7 +407,7 @@ function AppContent() {
       <Route path="/" element={<PrimaryLanding />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/onboarding" element={<OnboardingRoute />} />
       <Route path="/company-settings" element={<CompanySettings />} />
       <Route path="/user-settings" element={<UserSettings />} />
       <Route path="/chatbot-test" element={<ChatbotTest />} />
@@ -405,6 +443,7 @@ function AppContent() {
       <Route path="/growth-planning" element={<GrowthPlanning />} />
       <Route path="/all-reports" element={<AllReports />} />
       <Route path="/notifications" element={<Notifications />} />
+      <Route path="/advice" element={<Advice />} />
       <Route path="/policy-alerts" element={<PolicyAlerts />} />
       <Route path="/strategy-builder" element={<StrategyBuilder />} />
       <Route path="/risk-management" element={<RiskManagement />} />
@@ -502,7 +541,12 @@ const App = () => {
           <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
               <AuthProvider>
                 <CompanyInfoProvider>
                   <AppContent />

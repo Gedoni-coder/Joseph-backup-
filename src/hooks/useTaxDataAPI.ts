@@ -116,8 +116,8 @@ function mapObligation(o: ComplianceObligationRecord): ComplianceObligation {
     consequenceDetail: o.consequence_detail,
     status: o.status,
     assignedTo: o.assigned_to,
-    dependencies: o.dependencies,
-    documentationRequired: o.documentation_required,
+    dependencies: Array.isArray(o.dependencies) ? o.dependencies : [],
+    documentationRequired: Array.isArray(o.documentation_required) ? o.documentation_required : [],
     priority: o.priority,
   };
 }

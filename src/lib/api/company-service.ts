@@ -42,6 +42,11 @@ export async function getCompanyProfiles(): Promise<CompanyProfile[]> {
     headers: { ...authHeaders() },
   });
 
+  // Treat unauthenticated requests as "no profile yet" so pages can load.
+  if (response.status === 401 || response.status === 403) {
+    return [];
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to fetch company profiles: ${response.status}`);
   }

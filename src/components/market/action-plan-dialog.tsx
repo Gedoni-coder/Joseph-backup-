@@ -17,7 +17,9 @@ import { CheckCircle2 } from "lucide-react";
 interface ActionPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  reportId?: string;
   reportTitle?: string;
+  onCreated?: () => void | Promise<void>;
 }
 
 interface ActionPlanFormData {
@@ -37,7 +39,9 @@ interface ActionPlanFormData {
 export function ActionPlanDialog({
   open,
   onOpenChange,
+  reportId,
   reportTitle = "Market Analysis",
+  onCreated,
 }: ActionPlanDialogProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<ActionPlanFormData>({
@@ -55,6 +59,7 @@ export function ActionPlanDialog({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const baseUrl = import.meta.env.VITE_DJANGO_API_URL || "/api";
 
   const handleInputChange = (
     field: keyof ActionPlanFormData,
@@ -88,12 +93,40 @@ export function ActionPlanDialog({
 
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const numericReportId = Number(reportId);
+      const payload = {
+        report_note: Number.isFinite(numericReportId) ? numericReportId : null,
+        report_title: reportTitle,
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        owner: formData.owner,
+        timeline: formData.timeline,
+        target_date: formData.targetDate,
+        budget: formData.budget,
+        resources: formData.resources,
+        success_metrics: formData.successMetrics,
+        risks: formData.risks,
+        mitigation: formData.mitigation,
+      };
+
+      const response = await fetch(`${baseUrl}/market/report-action-plans/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed with status ${response.status}`);
+      }
+
+      await onCreated?.();
 
       toast({
         title: "Action Plan Created",
-        description: `"${formData.title}" has been created and saved successfully.`,
+        description: `"${formData.title}" has been saved to the database.`,
       });
 
       // Reset form and close dialog

@@ -43,7 +43,7 @@ export default function Login() {
     if (isAuthenticated) {
       navigate("/home", { replace: true });
     }
-  }, []);
+  }, [isAuthenticated, navigate]);
 
   const handleGoogleSignIn = useCallback(
     async (response: any) => {
@@ -105,7 +105,7 @@ export default function Login() {
         });
         window.google.accounts.id.renderButton(
           document.getElementById("googleSignInBtn"),
-          { theme: "outline", size: "large", width: "100%" },
+          { theme: "outline", size: "large", width: 360 },
         );
       }
     };
@@ -132,8 +132,7 @@ export default function Login() {
 
     try {
       await login(email, password);
-      // Navigate to home after successful login
-      navigate("/home", { replace: true });
+      // Redirect is handled by auth effect based on profile state.
     } catch (err) {
       setLocalError(error || "Login failed. Please try again.");
     }

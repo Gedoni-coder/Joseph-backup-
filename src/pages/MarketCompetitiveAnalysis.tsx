@@ -15,22 +15,12 @@ import { useCompanyInfo } from "@/lib/company-context";
 import { getCompanyName } from "@/lib/get-company-name";
 import { useMarketDataAPI } from "@/hooks/useMarketDataAPI";
 import { useCompetitiveDataAPI } from "@/hooks/useCompetitiveDataAPI";
-import { useMarketAnalysisData } from "@/hooks/useMarketAnalysisData";
 import { MarketAnalysis } from "@/components/market/market-analysis";
 import { ReportNotes } from "@/components/market/report-notes";
 import { CompetitiveAnalysis } from "@/components/competitive/competitive-analysis";
 import { CompetitiveStrategy } from "@/components/competitive/competitive-strategy";
 import { ModuleConversation } from "@/components/conversation/module-conversation";
 import { SummaryRecommendationSection } from "@/components/module/summary-recommendation-section";
-import {
-  SUMMARY_DESCRIPTION,
-  getSummaryContent,
-  getSummaryMetrics,
-  RECOMMENDATION_DESCRIPTION,
-  getRecommendationContent,
-  DEFAULT_ACTION_ITEMS,
-  DEFAULT_NEXT_STEPS,
-} from "@/mocks/market-competitive-analysis";
 import {
   BarChart3,
   TrendingUp,
@@ -56,6 +46,10 @@ export default function MarketCompetitiveAnalysis() {
     demandForecasts,
     industryInsights,
     reportNotes,
+    marketSummaries,
+    marketRecommendations,
+    marketActionItems,
+    marketNextSteps,
     isLoading: marketLoading,
     isConnected: marketConnected,
     lastUpdated: marketLastUpdated,
@@ -77,16 +71,6 @@ export default function MarketCompetitiveAnalysis() {
     refreshData: refreshCompetitiveData,
   } = useCompetitiveDataAPI();
 
-  const {
-    marketSizes: dynamicMarketSizes,
-    customerSegments: dynamicCustomerSegments,
-    marketTrends: dynamicMarketTrends,
-    demandForecasts: dynamicDemandForecasts,
-    industryInsights: dynamicIndustryInsights,
-    isDataAvailable,
-    dataSource,
-  } = useMarketAnalysisData();
-
   const [activeTab, setActiveTab] = useState("overview");
 
   const isLoading = marketLoading || competitiveLoading;
@@ -95,6 +79,51 @@ export default function MarketCompetitiveAnalysis() {
     Math.max(marketLastUpdated.getTime(), competitiveLastUpdated.getTime()),
   );
   const error = marketError || competitiveError;
+
+  const totalTamInBillions =
+    marketSizes.reduce((acc, marketSize) => acc + marketSize.tam, 0) /
+    1000;
+  const avgMarketGrowth =
+    marketSizes.length > 0
+      ? marketSizes.reduce((acc, marketSize) => acc + marketSize.growthRate, 0) /
+        marketSizes.length
+      : 0;
+
+  const latestSummary = marketSummaries[0];
+  const summaryText =
+    latestSummary?.content || "No market summary data available in the database.";
+  const summaryMetrics = (latestSummary?.keyPoints || []).map(
+    (keyPoint, index) => ({
+      index: index + 1,
+      title: `Key Point ${index + 1}`,
+      value: "-",
+      insight: keyPoint,
+    }),
+  );
+
+  const recommendationText = marketRecommendations.length
+    ? marketRecommendations
+        .map(
+          (recommendation, index) =>
+            `${index + 1}. ${recommendation.title}: ${recommendation.description}`,
+        )
+        .join("\n\n")
+    : "No recommendation data available in the database.";
+
+  const actionItems = marketActionItems.map((actionItem, index) => ({
+    index: index + 1,
+    title: actionItem.title,
+    description: actionItem.description,
+    priority: actionItem.priority,
+    timeline: actionItem.timeline,
+  }));
+
+  const nextSteps = marketNextSteps.map((nextStep, index) => ({
+    index: index + 1,
+    step: nextStep.step,
+    owner: nextStep.owner,
+    dueDate: nextStep.dueDate,
+  }));
 
   const refreshData = () => {
     refreshMarketData();
@@ -201,8 +230,7 @@ export default function MarketCompetitiveAnalysis() {
                       <div className="text-2xl font-bold text-gray-900">
                         $
                         {(
-                          marketSizes.reduce((acc, m) => acc + m.tam, 0) /
-                          1000000000
+                          totalTamInBillions
                         ).toFixed(0)}
                         B
                       </div>
@@ -249,10 +277,7 @@ export default function MarketCompetitiveAnalysis() {
                       <div className="text-sm text-gray-600">Market Growth</div>
                       <div className="text-2xl font-bold text-gray-900">
                         {(
-                          marketSizes.reduce(
-                            (acc, m) => acc + m.growthRate,
-                            0,
-                          ) / marketSizes.length
+                          avgMarketGrowth
                         ).toFixed(1)}
                         %
                       </div>
@@ -296,9 +321,11 @@ export default function MarketCompetitiveAnalysis() {
                           >
                             {trend.impact} impact
                           </Badge>
-                          <div className="text-sm text-gray-600">
-                            {trend.confidence}% confidence
-                          </div>
+                          {typeof trend.confidence === "number" && trend.confidence > 0 && (
+                            <div className="text-sm text-gray-600">
+                              {trend.confidence}% confidence
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -345,38 +372,26 @@ export default function MarketCompetitiveAnalysis() {
           <TabsContent value="summary-recommendation" className="space-y-8">
             <SummaryRecommendationSection
               summaryTitle="Market & Competitive Analysis Summary"
-              summaryDescription={SUMMARY_DESCRIPTION}
-              summaryText={getSummaryContent(
-                marketSizes.reduce((acc, m) => acc + m.tam, 0) / 1000000000,
-                marketSizes.reduce((acc, m) => acc + m.growthRate, 0) /
-                  marketSizes.length,
-                competitors.length,
-                customerSegments.length,
-              )}
-              summaryMetrics={getSummaryMetrics(
-                marketSizes.reduce((acc, m) => acc + m.tam, 0) / 1000000000,
-                marketSizes.reduce((acc, m) => acc + m.growthRate, 0) /
-                  marketSizes.length,
-                customerSegments.length,
-                competitors.length,
-              )}
+              summaryDescription="Executive summary loaded from market summary records in the database"
+              summaryText={summaryText}
+              summaryMetrics={summaryMetrics}
               recommendationTitle="Market & Competitive Recommendations"
-              recommendationDescription={RECOMMENDATION_DESCRIPTION}
-              recommendationText={getRecommendationContent()}
-              actionItems={DEFAULT_ACTION_ITEMS}
-              nextSteps={DEFAULT_NEXT_STEPS}
+              recommendationDescription="Prioritized recommendations and implementation tasks from the database"
+              recommendationText={recommendationText}
+              actionItems={actionItems}
+              nextSteps={nextSteps}
             />
           </TabsContent>
 
           <TabsContent value="market">
             <MarketAnalysis
-              marketSizes={dynamicMarketSizes.length > 0 ? dynamicMarketSizes : marketSizes}
-              customerSegments={dynamicCustomerSegments.length > 0 ? dynamicCustomerSegments : customerSegments}
-              marketTrends={dynamicMarketTrends.length > 0 ? dynamicMarketTrends : marketTrends}
-              demandForecasts={dynamicDemandForecasts.length > 0 ? dynamicDemandForecasts : demandForecasts}
-              industryInsights={dynamicIndustryInsights.length > 0 ? dynamicIndustryInsights : industryInsights}
-              isDataAvailable={isDataAvailable}
-              dataSource={dataSource}
+              marketSizes={marketSizes}
+              customerSegments={customerSegments}
+              marketTrends={marketTrends}
+              demandForecasts={demandForecasts}
+              industryInsights={industryInsights}
+              isDataAvailable={marketSizes.length > 0 || customerSegments.length > 0 || marketTrends.length > 0 || demandForecasts.length > 0 || industryInsights.length > 0}
+              dataSource="database"
             />
           </TabsContent>
 

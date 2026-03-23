@@ -7,6 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -88,6 +89,16 @@ export function EconomicTable({
       return `${diffInDays}d ago`;
     }
   };
+
+  if (news.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          No economic news found in the database for this context.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">

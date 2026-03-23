@@ -71,7 +71,7 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
         else if (diffDays <= 3) alertType = "urgent";
         else if (diffDays <= 7) alertType = "upcoming";
         else alertType = "early-warning";
-        if (o.status === "at_risk" && o.dependencies.length > 0) alertType = "dependency";
+        if (o.status === "at_risk" && (o.dependencies ?? []).length > 0) alertType = "dependency";
         return {
           id: `alert-${o.id}`,
           obligationId: o.id,
@@ -91,7 +91,7 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
   const [todoCompleted, setTodoCompleted] = useState<Set<string>>(new Set());
   const todoItems = useMemo<TodoItem[]>(() => {
     return obligations.flatMap((o) =>
-      o.documentationRequired.map((doc, i) => ({
+      (o.documentationRequired ?? []).map((doc, i) => ({
         id: `todo-${o.id}-${i}`,
         task: doc,
         description: `Prepare ${doc} for ${o.name}`,
@@ -110,10 +110,10 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
   });
 
   const dependencyAlerts: DependencyAlert[] = obligations
-    .filter((obl) => obl.status === "at_risk" && obl.dependencies.length > 0)
+    .filter((obl) => obl.status === "at_risk" && (obl.dependencies ?? []).length > 0)
     .map((obl) => ({
       obligationId: obl.id,
-      missingDependencies: obl.dependencies,
+      missingDependencies: obl.dependencies ?? [],
       riskLevel: obl.consequence as any,
     }));
 
@@ -338,13 +338,13 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
                         </div>
                       </div>
 
-                      {obl.dependencies.length > 0 && (
+                      {(obl.dependencies ?? []).length > 0 && (
                         <div className="mt-3 pt-3 border-t border-blue-100">
                           <p className="text-xs text-gray-600 mb-2">
                             Prerequisites required:
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {obl.dependencies.map((dep) => (
+                            {(obl.dependencies ?? []).map((dep) => (
                               <Badge
                                 key={dep}
                                 variant="secondary"
@@ -456,7 +456,7 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
                     Required Documentation
                   </h4>
                   <ul className="space-y-1 text-sm">
-                    {selectedObligation.documentationRequired.map(
+                    {(selectedObligation.documentationRequired ?? []).map(
                       (doc, idx) => (
                         <li key={idx} className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -467,13 +467,13 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
                   </ul>
                 </div>
 
-                {selectedObligation.dependencies.length > 0 && (
+                {(selectedObligation.dependencies ?? []).length > 0 && (
                   <div className="pt-4 border-t border-blue-200">
                     <h4 className="font-semibold text-blue-900 mb-2">
                       Prerequisites
                     </h4>
                     <div className="space-y-2">
-                      {selectedObligation.dependencies.map((dep) => (
+                      {(selectedObligation.dependencies ?? []).map((dep) => (
                         <div
                           key={dep}
                           className="flex items-center gap-2 text-sm"
@@ -790,9 +790,9 @@ export function ComplianceCalendar({ obligations }: ComplianceCalendarProps) {
                           >
                             {obl.status}
                           </Badge>
-                          {obl.dependencies.length > 0 && (
+                          {(obl.dependencies ?? []).length > 0 && (
                             <Badge variant="outline" className="text-xs">
-                              {obl.dependencies.length} prerequisites
+                              {(obl.dependencies ?? []).length} prerequisites
                             </Badge>
                           )}
                         </div>

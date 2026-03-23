@@ -27,7 +27,7 @@ import {
   type SWOTAnalysis,
   type ProductComparison,
   type MarketPosition,
-} from "@/lib/competitive-data";
+} from "@/hooks/useCompetitiveDataAPI";
 
 interface CompetitiveAnalysisProps {
   competitors: Competitor[];
@@ -42,49 +42,62 @@ export function CompetitiveAnalysis({
   productComparisons,
   marketPositions,
 }: CompetitiveAnalysisProps) {
-  const navigate = useNavigate();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [localCompetitors, setLocalCompetitors] = useState<Competitor[]>([]);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    website: "",
-    type: "direct" as Competitor["type"],
-  });
+  const asArray = <T,>(value: T[] | undefined | null): T[] =>
+    Array.isArray(value) ? value : [];
 
-  const displayCompetitors = [...competitors, ...localCompetitors];
+  const toValidNumber = (value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? value : null;
 
-  const handleAdd = () => {
-    if (!form.name.trim()) return;
-    setAdding(true);
-    setTimeout(() => {
-      const newComp: Competitor = {
-        id: Date.now().toString(),
-        name: form.name.trim(),
-        description: form.description.trim() || "Added via assistant",
-        type: form.type,
-        marketShare: 0,
-        revenue: 0,
-        employees: 0,
-        keyProducts: [],
-        founded: new Date().getFullYear().toString(),
-        headquarters: "",
+  const normalizeSwotItem = (item: any) => {
+    if (typeof item === "string") {
+      return {
+        factor: item,
+        description: item,
+        impact: "medium",
+        confidence: 70,
       };
-      setLocalCompetitors((prev) => [newComp, ...prev]);
-      setAdding(false);
-      setShowAddForm(false);
-      setForm({ name: "", description: "", website: "", type: "direct" });
-    }, 800);
+    }
+
+    return {
+      factor: item?.factor || item?.name || "Item",
+      description: item?.description || item?.factor || item?.name || "",
+      impact: item?.impact || "medium",
+      confidence: toValidNumber(item?.confidence) ?? 70,
+    };
   };
-  const formatCurrency = (amount: number) => {
-    if (amount >= 1000000000) {
-      return `$${(amount / 1000000000).toFixed(1)}B`;
+
+  const normalizeFeatures = (features: any) => {
+    if (Array.isArray(features)) {
+      return features;
     }
-    if (amount >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
+
+    if (features && typeof features === "object") {
+      return Object.entries(features).map(([name, value]) => ({
+        feature: name,
+        ourProduct: "good",
+        competitor: typeof value === "string" ? value : "basic",
+        notes: typeof value === "string" ? value : "",
+      }));
     }
-    return `$${amount.toLocaleString()}`;
+
+    return [];
+  };
+
+  const navigate = useNavigate();
+  const displayCompetitors = competitors;
+  const formatCurrency = (amount: unknown, fallback = "N/A") => {
+    const validAmount = toValidNumber(amount);
+    if (validAmount === null) {
+      return fallback;
+    }
+
+    if (validAmount >= 1000000000) {
+      return `$${(validAmount / 1000000000).toFixed(1)}B`;
+    }
+    if (validAmount >= 1000000) {
+      return `$${(validAmount / 1000000).toFixed(1)}M`;
+    }
+    return `$${validAmount.toLocaleString()}`;
   };
 
   const getTypeColor = (type: string) => {
@@ -153,53 +166,24 @@ export function CompetitiveAnalysis({
           <h2 className="text-2xl font-bold text-gray-900">
             Key Competitor Identification
           </h2>
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowAddForm((s) => !s)}>
+          <Button className="bg-blue-600 hover:bg-blue-700" disabled>
             <Building className="w-4 h-4 mr-2" />
-            {showAddForm ? "Close" : "Add Competitor"}
+            Database Records
           </Button>
         </div>
 
-        {showAddForm && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <Input
-                  placeholder="Competitor Name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-                <Input
-                  placeholder="Website (optional)"
-                  value={form.website}
-                  onChange={(e) => setForm({ ...form, website: e.target.value })}
-                />
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value as Competitor["type"] })}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="direct">Direct</option>
-                  <option value="indirect">Indirect</option>
-                  <option value="substitute">Substitute</option>
-                </select>
-                <Button onClick={handleAdd} disabled={adding || !form.name} className="bg-blue-600 hover:bg-blue-700">
-                  {adding ? "Adding..." : "Go"}
-                </Button>
-              </div>
-              <div className="mt-3">
-                <Textarea
-                  placeholder="Short description"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="min-h-[70px]"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {displayCompetitors.map((competitor) => (
+          {displayCompetitors.map((competitor) => {
+            const competitorAny = competitor as any;
+            const competitorType = competitorAny.type || "direct";
+            const marketShare = toValidNumber(competitorAny.marketShare ?? competitorAny.market_share);
+            const revenue = competitorAny.revenue;
+            const employees = toValidNumber(competitorAny.employees);
+            const keyProducts = asArray(competitorAny.keyProducts);
+            const founded = competitorAny.founded;
+            const headquarters = competitorAny.headquarters ?? "";
+
+            return (
             <Card
               key={competitor.id}
               className="hover:shadow-lg transition-shadow"
@@ -207,8 +191,8 @@ export function CompetitiveAnalysis({
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">{competitor.name}</CardTitle>
-                  <Badge className={getTypeColor(competitor.type)}>
-                    {competitor.type}
+                  <Badge className={getTypeColor(competitorType)}>
+                    {competitorType}
                   </Badge>
                 </div>
                 <CardDescription>{competitor.description}</CardDescription>
@@ -219,19 +203,19 @@ export function CompetitiveAnalysis({
                   <div className="text-center">
                     <div className="text-xs text-gray-500">Market Share</div>
                     <div className="text-lg font-bold text-blue-600">
-                      {competitor.marketShare}%
+                      {typeof marketShare === "number" ? `${marketShare}%` : "-"}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-xs text-gray-500">Revenue</div>
                     <div className="text-lg font-bold">
-                      {formatCurrency(competitor.revenue)}
+                      {formatCurrency(revenue)}
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-xs text-gray-500">Employees</div>
                     <div className="text-lg font-bold">
-                      {competitor.employees.toLocaleString()}
+                      {typeof employees === "number" ? employees.toLocaleString() : "-"}
                     </div>
                   </div>
                 </div>
@@ -241,7 +225,7 @@ export function CompetitiveAnalysis({
                     Key Products
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {competitor.keyProducts.map((product, index) => (
+                    {keyProducts.map((product, index) => (
                       <Badge key={index} variant="outline" className="text-xs">
                         {product}
                       </Badge>
@@ -250,8 +234,8 @@ export function CompetitiveAnalysis({
                 </div>
 
                 <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>Founded {competitor.founded}</span>
-                  <span>{competitor.headquarters}</span>
+                  <span>Founded {typeof founded === "number" ? founded : "-"}</span>
+                  <span>{headquarters}</span>
                 </div>
 
                 <div className="flex space-x-2">
@@ -269,7 +253,8 @@ export function CompetitiveAnalysis({
                 </div>
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       </div>
 
@@ -277,16 +262,22 @@ export function CompetitiveAnalysis({
       <div className="space-y-4">
         <h2 className="text-2xl font-bold text-gray-900">SWOT Analysis</h2>
 
-        {swotAnalyses.map((swot) => (
+        {swotAnalyses.map((swot) => {
+          const swotAny = swot as any;
+          const swotCompetitor = swotAny.competitor || swotAny.competitor_name || "Competitor";
+          const overallScore = toValidNumber(swotAny.overallScore ?? swotAny.overall_score) ?? 0;
+          const lastUpdated = swotAny.lastUpdated || swotAny.created_at;
+
+          return (
           <Card key={swot.id} className="hover:shadow-lg transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl">{swot.competitor}</CardTitle>
+                <CardTitle className="text-xl">{swotCompetitor}</CardTitle>
                 <div className="flex items-center space-x-3">
                   <Badge variant="outline">
-                    Overall Score: {swot.overallScore}/100
+                    Overall Score: {overallScore}/100
                   </Badge>
-                  <Progress value={swot.overallScore} className="w-24 h-2" />
+                  <Progress value={overallScore} className="w-24 h-2" />
                 </div>
               </div>
               <CardDescription>
@@ -295,7 +286,7 @@ export function CompetitiveAnalysis({
                   month: "short",
                   day: "numeric",
                   year: "numeric",
-                }).format(swot.lastUpdated)}
+                }).format(lastUpdated ? new Date(lastUpdated) : new Date())}
               </CardDescription>
             </CardHeader>
 
@@ -307,35 +298,38 @@ export function CompetitiveAnalysis({
                     <Star className="w-5 h-5 mr-2" />
                     Strengths
                   </h3>
-                  {swot.strengths.map((item, index) => (
+                  {asArray(swotAny.strengths).map((item, index) => {
+                    const normalized = normalizeSwotItem(item);
+                    return (
                     <div key={index} className="p-3 bg-green-50 rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-green-900">
-                          {item.factor}
+                          {normalized.factor}
                         </span>
                         <Badge
                           className={
-                            item.impact === "high"
+                            normalized.impact === "high"
                               ? "bg-green-100 text-green-800"
-                              : item.impact === "medium"
+                              : normalized.impact === "medium"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-gray-100 text-gray-800"
                           }
                         >
-                          {item.impact}
+                          {normalized.impact}
                         </Badge>
                       </div>
                       <p className="text-sm text-green-700">
-                        {item.description}
+                        {normalized.description}
                       </p>
                       <div className="mt-2">
-                        <Progress value={item.confidence} className="h-1.5" />
+                        <Progress value={normalized.confidence} className="h-1.5" />
                         <div className="text-xs text-green-600 mt-1">
-                          {item.confidence}% confidence
+                          {normalized.confidence}% confidence
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Weaknesses */}
@@ -344,33 +338,36 @@ export function CompetitiveAnalysis({
                     <AlertTriangle className="w-5 h-5 mr-2" />
                     Weaknesses
                   </h3>
-                  {swot.weaknesses.map((item, index) => (
+                  {asArray(swotAny.weaknesses).map((item, index) => {
+                    const normalized = normalizeSwotItem(item);
+                    return (
                     <div key={index} className="p-3 bg-red-50 rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-red-900">
-                          {item.factor}
+                          {normalized.factor}
                         </span>
                         <Badge
                           className={
-                            item.impact === "high"
+                            normalized.impact === "high"
                               ? "bg-red-100 text-red-800"
-                              : item.impact === "medium"
+                              : normalized.impact === "medium"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-gray-100 text-gray-800"
                           }
                         >
-                          {item.impact}
+                          {normalized.impact}
                         </Badge>
                       </div>
-                      <p className="text-sm text-red-700">{item.description}</p>
+                      <p className="text-sm text-red-700">{normalized.description}</p>
                       <div className="mt-2">
-                        <Progress value={item.confidence} className="h-1.5" />
+                        <Progress value={normalized.confidence} className="h-1.5" />
                         <div className="text-xs text-red-600 mt-1">
-                          {item.confidence}% confidence
+                          {normalized.confidence}% confidence
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Opportunities */}
@@ -379,35 +376,38 @@ export function CompetitiveAnalysis({
                     <TrendingUp className="w-5 h-5 mr-2" />
                     Opportunities
                   </h3>
-                  {swot.opportunities.map((item, index) => (
+                  {asArray(swotAny.opportunities).map((item, index) => {
+                    const normalized = normalizeSwotItem(item);
+                    return (
                     <div key={index} className="p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-blue-900">
-                          {item.factor}
+                          {normalized.factor}
                         </span>
                         <Badge
                           className={
-                            item.impact === "high"
+                            normalized.impact === "high"
                               ? "bg-blue-100 text-blue-800"
-                              : item.impact === "medium"
+                              : normalized.impact === "medium"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-gray-100 text-gray-800"
                           }
                         >
-                          {item.impact}
+                          {normalized.impact}
                         </Badge>
                       </div>
                       <p className="text-sm text-blue-700">
-                        {item.description}
+                        {normalized.description}
                       </p>
                       <div className="mt-2">
-                        <Progress value={item.confidence} className="h-1.5" />
+                        <Progress value={normalized.confidence} className="h-1.5" />
                         <div className="text-xs text-blue-600 mt-1">
-                          {item.confidence}% confidence
+                          {normalized.confidence}% confidence
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Threats */}
@@ -416,40 +416,44 @@ export function CompetitiveAnalysis({
                     <AlertTriangle className="w-5 h-5 mr-2" />
                     Threats
                   </h3>
-                  {swot.threats.map((item, index) => (
+                  {asArray(swotAny.threats).map((item, index) => {
+                    const normalized = normalizeSwotItem(item);
+                    return (
                     <div key={index} className="p-3 bg-orange-50 rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-orange-900">
-                          {item.factor}
+                          {normalized.factor}
                         </span>
                         <Badge
                           className={
-                            item.impact === "high"
+                            normalized.impact === "high"
                               ? "bg-orange-100 text-orange-800"
-                              : item.impact === "medium"
+                              : normalized.impact === "medium"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-gray-100 text-gray-800"
                           }
                         >
-                          {item.impact}
+                          {normalized.impact}
                         </Badge>
                       </div>
                       <p className="text-sm text-orange-700">
-                        {item.description}
+                        {normalized.description}
                       </p>
                       <div className="mt-2">
-                        <Progress value={item.confidence} className="h-1.5" />
+                        <Progress value={normalized.confidence} className="h-1.5" />
                         <div className="text-xs text-orange-600 mt-1">
-                          {item.confidence}% confidence
+                          {normalized.confidence}% confidence
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {/* Product & Feature Comparison */}
@@ -458,7 +462,14 @@ export function CompetitiveAnalysis({
           Pricing, Product & Feature Comparison
         </h2>
 
-        {productComparisons.map((comparison) => (
+        {productComparisons.map((comparison) => {
+          const comparisonAny = comparison as any;
+          const pricing = comparisonAny.pricing || comparisonAny.pricing_comparison || {};
+          const features = normalizeFeatures(comparisonAny.features);
+          const strengths = asArray(comparisonAny.strengths);
+          const weaknesses = asArray(comparisonAny.weaknesses);
+
+          return (
           <Card
             key={comparison.id}
             className="hover:shadow-lg transition-shadow"
@@ -467,20 +478,20 @@ export function CompetitiveAnalysis({
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl">
-                    {comparison.competitor}
+                    {comparisonAny.competitor || comparisonAny.product_name || "Competitor"}
                   </CardTitle>
-                  <CardDescription>{comparison.product}</CardDescription>
+                  <CardDescription>{comparisonAny.product || comparisonAny.product_name || "Product"}</CardDescription>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-gray-600">Starting Price</div>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${comparison.pricing.startingPrice}/
-                    {comparison.pricing.model.includes("month") ? "mo" : "user"}
+                    ${toValidNumber(pricing.startingPrice ?? pricing.starting_price) ?? 0}/
+                    {String(pricing.model || "user").includes("month") ? "mo" : "user"}
                   </div>
                   <Badge
-                    className={getQuadrantColor(comparison.marketPosition)}
+                    className={getQuadrantColor(comparisonAny.marketPosition || comparisonAny.market_position || "niche")}
                   >
-                    {comparison.marketPosition}
+                    {comparisonAny.marketPosition || comparisonAny.market_position || "niche"}
                   </Badge>
                 </div>
               </div>
@@ -493,7 +504,7 @@ export function CompetitiveAnalysis({
                   Feature Comparison
                 </h3>
                 <div className="space-y-3">
-                  {comparison.features.map((feature, index) => (
+                  {features.map((feature, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
@@ -546,7 +557,7 @@ export function CompetitiveAnalysis({
                     Their Strengths
                   </h4>
                   <ul className="space-y-1">
-                    {comparison.strengths.map((strength, index) => (
+                    {strengths.map((strength, index) => (
                       <li
                         key={index}
                         className="text-sm text-gray-700 flex items-start"
@@ -562,7 +573,7 @@ export function CompetitiveAnalysis({
                     Their Weaknesses
                   </h4>
                   <ul className="space-y-1">
-                    {comparison.weaknesses.map((weakness, index) => (
+                    {weaknesses.map((weakness, index) => (
                       <li
                         key={index}
                         className="text-sm text-gray-700 flex items-start"
@@ -576,7 +587,8 @@ export function CompetitiveAnalysis({
               </div>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {/* Market Share & Positioning Map */}
@@ -594,19 +606,28 @@ export function CompetitiveAnalysis({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              {marketPositions.map((position) => (
+              {marketPositions.map((position) => {
+                const positionAny = position as any;
+                const competitorName = positionAny.competitor || positionAny.our_position || positionAny.market_segment || "Market Position";
+                const quadrant = positionAny.quadrant || "niche";
+                const valueScore = toValidNumber(positionAny?.position?.value) ?? 0;
+                const priceScore = toValidNumber(positionAny?.position?.price) ?? 0;
+                const volumeScore = toValidNumber(positionAny?.position?.volume ?? positionAny.market_share_estimate) ?? 0;
+                const keyDifferentiators = asArray(positionAny.keyDifferentiators || positionAny.primary_competitors);
+
+                return (
                 <div
                   key={position.id}
                   className={`p-4 rounded-lg border-2 ${
-                    position.competitor === "Our Product"
+                    competitorName === "Our Product"
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-200 bg-gray-50"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold">{position.competitor}</h3>
-                    <Badge className={getQuadrantColor(position.quadrant)}>
-                      {position.quadrant}
+                    <h3 className="font-semibold">{competitorName}</h3>
+                    <Badge className={getQuadrantColor(quadrant)}>
+                      {quadrant}
                     </Badge>
                   </div>
 
@@ -614,13 +635,13 @@ export function CompetitiveAnalysis({
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Value:</span>
                       <span className="font-medium">
-                        {position.position.value}/10
+                        {valueScore}/10
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Price:</span>
                       <span className="font-medium">
-                        {position.position.price}/10
+                        {priceScore}/10
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -628,7 +649,7 @@ export function CompetitiveAnalysis({
                         Market Share:
                       </span>
                       <span className="font-medium">
-                        {position.position.volume}%
+                        {volumeScore}%
                       </span>
                     </div>
                   </div>
@@ -636,13 +657,14 @@ export function CompetitiveAnalysis({
                   <div className="text-xs text-gray-600">
                     <div className="mb-1">Key Differentiators:</div>
                     <ul className="space-y-1">
-                      {position.keyDifferentiators.map((diff, index) => (
+                      {keyDifferentiators.map((diff, index) => (
                         <li key={index}>• {diff}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

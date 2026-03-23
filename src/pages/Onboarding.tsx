@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCompanyInfo } from "@/lib/company-context";
+import { useAuth } from "@/lib/auth-context";
 import { useCurrency } from "@/lib/currency-context";
 import { AlertCircle, Upload, Sparkles, Edit2, Check } from "lucide-react";
 
@@ -228,6 +229,7 @@ const NATIONAL_CURRENCIES = [
 export default function Onboarding() {
   const navigate = useNavigate();
   const { updateCompanyInfo, companyInfo } = useCompanyInfo();
+  const { checkAuth } = useAuth();
   const { setCurrency } = useCurrency();
 
   // Required fields
@@ -349,7 +351,8 @@ export default function Onboarding() {
 
     // Simulate form submission
     setTimeout(() => {
-      updateCompanyInfo({
+      Promise.resolve(
+        updateCompanyInfo({
         companyName,
         description,
         numberOfWorkers: Number(numberOfWorkers),
@@ -367,15 +370,28 @@ export default function Onboarding() {
         ...(fiscalYearEndDate && { fiscalYearEndDate }),
         ...(language && { language }),
         ...(numberOfEntities && { numberOfEntities: Number(numberOfEntities) }),
-      });
+      }),
+      )
+        .then(async () => {
+          // Sync with global currency context
+          if (currencyPreference) {
+            setCurrency(currencyPreference);
+          }
 
-      // Sync with global currency context
-      if (currencyPreference) {
-        setCurrency(currencyPreference);
-      }
-
-      setLoading(false);
-      navigate("/home");
+          // Refresh auth user so has_company_profile is immediately reflected.
+          await checkAuth();
+          navigate("/home", { replace: true });
+        })
+        .catch((err) => {
+          console.error("Failed to save onboarding info:", err);
+          setErrors((prev) => ({
+            ...prev,
+            form: "Failed to save company profile. Please try again.",
+          }));
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }, 1000);
   };
 

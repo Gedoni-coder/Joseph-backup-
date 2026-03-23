@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -55,6 +55,7 @@ export default function RevenueStrategy() {
     metrics,
     discounts,
     channels,
+    upsellInsights,
     isLoading,
     isConnected,
     lastUpdated,
@@ -63,6 +64,10 @@ export default function RevenueStrategy() {
   } = useRevenueDataAPI();
   const [activeTab, setActiveTab] = useState("overview");
   const [streams, setStreams] = useState(initialStreams);
+
+  useEffect(() => {
+    setStreams(initialStreams);
+  }, [initialStreams]);
 
   const handleAddStream = (newStream: (typeof initialStreams)[0]) => {
     setStreams([...streams, newStream]);
@@ -380,7 +385,7 @@ export default function RevenueStrategy() {
           </TabsContent>
 
           <TabsContent value="upsell">
-            <UpsellOpportunities upsells={upsells} />
+            <UpsellOpportunities upsells={upsells} insights={upsellInsights} />
           </TabsContent>
 
           <TabsContent value="conversation" className="h-[600px]">

@@ -130,8 +130,10 @@ const solutionGroups: NavGroup[] = [
       { title: "Document Manager", url: "/document-manager", icon: FolderOpen },
       { title: "Document Upload", url: "/document-upload", icon: Upload },
       { title: "All Reports", url: "/all-reports", icon: FileText },
+      { title: "Audit Reports", url: "/audit-reports", icon: ClipboardList },
       { title: "Risk Management", url: "/risk-management", icon: AlertTriangle },
       { title: "Notifications", url: "/notifications", icon: Bell },
+      { title: "Advice Hub", url: "/advice", icon: Lightbulb },
     ],
   },
 ];

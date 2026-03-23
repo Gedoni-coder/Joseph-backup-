@@ -15,6 +15,14 @@ interface ConversationMessage {
   timestamp: string;
 }
 
+interface ApiConversationMessage {
+  id: string | number;
+  role?: "user" | "assistant" | "system";
+  type?: "user" | "assistant";
+  content: string;
+  timestamp: string;
+}
+
 interface Conversation {
   id: string;
   module: string;
@@ -60,15 +68,39 @@ export function ModuleConversation({
     return path; // fallback to relative (same-origin when served by Django)
   };
 
+  const backendModule =
+    module === "market_analysis"
+      ? "market"
+      : module === "pricing_strategy"
+        ? "pricing"
+        : module === "revenue_strategy"
+          ? "revenue"
+          : module;
+
+  const normalizeMessage = (message: ApiConversationMessage): ConversationMessage => ({
+    id: String(message.id),
+    type: message.type || (message.role === "assistant" ? "assistant" : "user"),
+    content: message.content,
+    timestamp: message.timestamp,
+  });
+
+  const normalizeConversation = (rawConversation: any): Conversation => ({
+    ...rawConversation,
+    id: String(rawConversation.id),
+    messages: Array.isArray(rawConversation.messages)
+      ? rawConversation.messages.map(normalizeMessage)
+      : [],
+  });
+
   const createOrLoadConversation = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(apiUrl(`/chatbot/conversations/?module=${module}`));
+      const response = await fetch(apiUrl(`/chatbot/conversations/?module=${backendModule}`));
       if (response.ok) {
         const data = await response.json();
         const conversations = Array.isArray(data) ? data : data.results || [];
         if (conversations.length > 0) {
-          setConversation(conversations[0]);
+          setConversation(normalizeConversation(conversations[0]));
           return;
         }
       }
@@ -101,13 +133,13 @@ export function ModuleConversation({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          module,
+          module: backendModule,
           title: `${moduleTitle} Discussion`,
         }),
       });
       if (response.ok) {
         const newConversation = await response.json();
-        setConversation(newConversation);
+        setConversation(normalizeConversation(newConversation));
         return;
       }
     } catch (error) {
@@ -157,7 +189,7 @@ export function ModuleConversation({
         body: JSON.stringify({
           conversation: conversation.id,
           content: userInput,
-          module,
+          module: backendModule,
         }),
       });
 
@@ -172,11 +204,20 @@ export function ModuleConversation({
             : null,
         );
       } else {
-        // Provide fallback response if API fails
+        let backendError = `I'm currently unable to process your request about ${moduleTitle}. Please try again in a moment.`;
+        try {
+          const errorData = await response.json();
+          if (typeof errorData?.error === "string" && errorData.error.trim()) {
+            backendError = errorData.error;
+          }
+        } catch {
+          // Keep generic fallback message.
+        }
+
         const fallbackMessage: ConversationMessage = {
           id: (Date.now() + 1).toString(),
           type: "assistant",
-          content: `I'm currently unable to process your request about ${moduleTitle}. Please try again in a moment.`,
+          content: backendError,
           timestamp: new Date().toISOString(),
         };
         setConversation((prev) =>

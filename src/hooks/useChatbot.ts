@@ -27,6 +27,9 @@ export function useChatbot() {
   );
   const [selectedTool, setSelectedTool] = useState<EconomicTool | null>(null);
   const [isToolOpen, setIsToolOpen] = useState(false);
+  const [conversationIdsByContext, setConversationIdsByContext] = useState<
+    Record<string, string>
+  >({});
 
   // Get messages for current context
   const messages = messagesByContext[currentContext.id] || [];
@@ -124,6 +127,80 @@ export function useChatbot() {
     }
   }, [location.pathname, currentContext.id, addMessage]); // Remove messagesByContext dependency
 
+  const resolveBackendModule = useCallback((contextId: string) => {
+    const moduleMap: Record<string, string> = {
+      "market_analysis": "market",
+      "market-analysis": "market",
+      "pricing_strategy": "pricing",
+      "pricing-strategy": "pricing",
+      "revenue_strategy": "revenue",
+      "revenue-strategy": "revenue",
+      "business-forecast": "business",
+      "loan-funding": "loan",
+      "financial-advisory": "financial",
+      "tax-compliance": "tax",
+      "policy-economic": "policy",
+      "inventory-supply": "inventory",
+      "economic-forecasting": "economic",
+    };
+
+    return moduleMap[contextId] || contextId;
+  }, []);
+
+  const apiUrl = useCallback((path: string) => {
+    const backendBase = (
+      import.meta.env.VITE_CHATBOT_BACKEND_URL as string | undefined
+    )?.trim();
+    if (backendBase && /^https?:\/\//i.test(backendBase)) {
+      return `${backendBase.replace(/\/$/, "")}${path}`;
+    }
+    return path;
+  }, []);
+
+  const getOrCreateConversationId = useCallback(
+    async (contextId: string) => {
+      if (conversationIdsByContext[contextId]) {
+        return conversationIdsByContext[contextId];
+      }
+
+      const module = resolveBackendModule(contextId);
+      const listResponse = await fetch(
+        apiUrl(`/chatbot/conversations/?module=${module}`),
+      );
+
+      if (listResponse.ok) {
+        const listData = await listResponse.json();
+        const conversations = Array.isArray(listData)
+          ? listData
+          : listData?.results || [];
+        if (conversations.length > 0) {
+          const id = String(conversations[0].id);
+          setConversationIdsByContext((prev) => ({ ...prev, [contextId]: id }));
+          return id;
+        }
+      }
+
+      const createResponse = await fetch(apiUrl("/chatbot/conversations/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          module,
+          title: `${currentContext.name} Discussion`,
+        }),
+      });
+
+      if (!createResponse.ok) {
+        throw new Error("Failed to create conversation");
+      }
+
+      const created = await createResponse.json();
+      const id = String(created.id);
+      setConversationIdsByContext((prev) => ({ ...prev, [contextId]: id }));
+      return id;
+    },
+    [apiUrl, conversationIdsByContext, currentContext.name, resolveBackendModule],
+  );
+
   const sendMessage = useCallback(
     async (content: string, context?: string) => {
       if (!content.trim()) return;
@@ -155,6 +232,64 @@ export function useChatbot() {
       ];
 
       try {
+        const conversationId = await getOrCreateConversationId(targetContext);
+        const module = resolveBackendModule(targetContext);
+        const moduleResponse = await fetch(apiUrl("/chatbot/module-chat/"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversation: conversationId,
+            content: content.trim(),
+            module,
+          }),
+        });
+
+        if (moduleResponse.ok) {
+          const moduleData = await moduleResponse.json();
+          const assistant = moduleData?.assistant_message;
+          const assistantMessage = {
+            type: "assistant" as const,
+            content:
+              typeof assistant?.content === "string"
+                ? assistant.content
+                : "I could not generate a response right now. Please try again.",
+            context: targetContext,
+            id:
+              assistant?.id ||
+              `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: assistant?.timestamp
+              ? new Date(assistant.timestamp)
+              : new Date(),
+          };
+
+          setMessagesByContext((prev) => ({
+            ...prev,
+            [targetContext]: [...(prev[targetContext] || []), assistantMessage],
+          }));
+          setIsTyping(false);
+          return;
+        }
+
+        // If module-chat endpoint is reachable but fails (for example missing API key),
+        // surface that backend error directly instead of cascading to other providers.
+        let backendError = "I could not generate a response right now. Please try again.";
+        try {
+          const errorData = await moduleResponse.json();
+          if (typeof errorData?.error === "string" && errorData.error.trim()) {
+            backendError = errorData.error;
+          }
+        } catch {
+          // Ignore parse errors and keep generic message.
+        }
+
+        addMessage({
+          type: "assistant",
+          content: backendError,
+          context: targetContext,
+        });
+        setIsTyping(false);
+        return;
+
         // SINGLE backendBase declaration at method scope
         const backendBase = (
           import.meta.env.VITE_CHATBOT_BACKEND_URL as string | undefined
@@ -373,7 +508,13 @@ export function useChatbot() {
 
       setIsTyping(false);
     },
-    [currentContext.id, messagesByContext],
+    [
+      apiUrl,
+      currentContext.id,
+      getOrCreateConversationId,
+      messagesByContext,
+      resolveBackendModule,
+    ],
   );
 
   const switchContext = useCallback(

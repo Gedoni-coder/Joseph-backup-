@@ -150,6 +150,97 @@ export interface LiquidityMetric {
   trend: "improving" | "stable" | "declining";
 }
 
+export interface BudgetValidationSummary {
+  accuracyScore: number;
+  avgVariance: number;
+  validatedForecasts: number;
+  budgetAlignment: number;
+}
+
+export interface ForecastValidationRecord {
+  id: string;
+  period: string;
+  validationStatus: "accurate" | "acceptable" | "concerning" | "pending";
+  forecastedRevenue: number;
+  actualRevenue?: number;
+  revenueVariance: number;
+  forecastedNetIncome: number;
+  actualNetIncome?: number;
+  accuracyScore: number;
+}
+
+export interface BudgetAlignmentItem {
+  id: string;
+  name: string;
+  score: number;
+}
+
+export interface ForecastImprovementArea {
+  id: string;
+  title: string;
+  summary: string;
+  icon: "trending-up" | "alert-circle" | "calendar";
+  theme: "green" | "yellow" | "blue";
+  sections: Array<{
+    heading: string;
+    body?: string;
+    bullets?: string[];
+  }>;
+  recommendedAction: string;
+}
+
+export interface ScenarioResilienceMetric {
+  id: string;
+  name: string;
+  value: string;
+  valueTone: string;
+  description: string;
+}
+
+export interface RecommendedStressTest {
+  id: string;
+  title: string;
+  description: string;
+  icon: "alert-triangle" | "trending-down" | "activity";
+  scenarioTemplate: {
+    testVariable?: string;
+    changePercent?: number;
+    testType?: "stress" | "sensitivity" | "monte_carlo";
+  };
+}
+
+export interface ScenarioSummaryCard {
+  id: string;
+  key:
+    | "total_scenarios"
+    | "critical_scenarios"
+    | "average_probability"
+    | "resilience_score";
+  label: string;
+  value: string;
+}
+
+export interface RiskSummaryCard {
+  id: string;
+  key: "total_risks" | "high_risk_items" | "average_risk_score" | "resolved_risks";
+  label: string;
+  value: string;
+}
+
+export interface RiskCategoryDistribution {
+  id: string;
+  category: "liquidity" | "credit" | "market" | "operational" | "regulatory";
+  count: number;
+}
+
+export interface RiskMitigationStrategy {
+  id: string;
+  riskName: string;
+  riskScore: number;
+  recommendedActions: string[];
+  lastReviewed?: string;
+}
+
 // Mock data
 export const mockBudgetForecasts: BudgetForecast[] = [
   {

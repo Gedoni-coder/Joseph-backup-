@@ -19,7 +19,12 @@ import {
   Search,
   X,
   Menu,
+  Loader2,
 } from "lucide-react";
+import {
+  listAdviceMessages,
+  markAdviceAsRead,
+} from "@/lib/api/advice-service";
 
 interface AdviceMessage {
   id: string;
@@ -61,7 +66,9 @@ const AdviceHub = () => {
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef(null);
+  const [adviceMessages, setAdviceMessages] = useState<AdviceMessage[]>([]);
 
   const modulesList = [
     { id: "econ-forecast", name: "Economic Forecasting", icon: "📊" },
@@ -77,140 +84,23 @@ const AdviceHub = () => {
     { id: "sales-intelligence", name: "Sales Intelligence", icon: "🎯" },
   ];
 
-  const [adviceMessages, setAdviceMessages] = useState<AdviceMessage[]>([
-    {
-      id: "msg-1",
-      moduleId: "sales-intelligence",
-      moduleName: "Sales Intelligence",
-      moduleIcon: "🎯",
-      title: "Focus on top 3 accounts for better pipeline management",
-      content:
-        "Focus on the top 3 accounts in your pipeline representing 45% of potential revenue. Implement daily check-ins for these deals and assign a dedicated account manager. This approach has shown a 23% improvement in close rates.",
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-2",
-      moduleId: "sales-intelligence",
-      moduleName: "Sales Intelligence",
-      moduleIcon: "🎯",
-      title: "3 deals at risk - immediate rescue strategy recommended",
-      content:
-        "3 deals at risk detected in your pipeline. Recommended rescue strategy: Send personalized value ROI summary + decision reminder within 24 hours. Success rate: 68% for similar scenarios. Total recoverable value: $180K.",
-      timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-3",
-      moduleId: "revenue-strategy",
-      moduleName: "Revenue Strategy",
-      moduleIcon: "💵",
-      title: "Reallocate budget to WhatsApp for higher engagement",
-      content:
-        "Your engagement score on WhatsApp is 95% vs 52% on Email. Reallocate 30% of email budget to WhatsApp campaigns. Projected additional revenue: $125K over Q2.",
-      timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-      isRead: true,
-    },
-    {
-      id: "msg-4",
-      moduleId: "revenue-strategy",
-      moduleName: "Revenue Strategy",
-      moduleIcon: "💵",
-      title: "Referral customers have 42% higher lifetime value",
-      content:
-        "Customer retention insight: Customers acquired through referrals have 42% higher lifetime value. Create referral incentive program with 15% discount. ROI projection: 340% within 6 months.",
-      timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      isRead: true,
-    },
-    {
-      id: "msg-5",
-      moduleId: "biz-forecast",
-      moduleName: "Business Forecasting",
-      moduleIcon: "📈",
-      title: "Pipeline health declining - deal size and closure rate down",
-      content:
-        "Pipeline health score: 8.5/10. Two key risks identified: Deal closure rate declining and average deal size trending down. Recommend immediate intervention.",
-      timestamp: new Date(Date.now() - 10 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-6",
-      moduleId: "sales-intelligence",
-      moduleName: "Sales Intelligence",
-      moduleIcon: "🎯",
-      title: "Team member performance analysis - coaching opportunity",
-      content:
-        "Sales rep shows potential to reach top performer status. His deal size is 23% higher than team average. Focus coaching on follow-up consistency. Expected improvement: 15% in closing ratio.",
-      timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-7",
-      moduleId: "econ-forecast",
-      moduleName: "Economic Forecasting",
-      moduleIcon: "📊",
-      title: "Q2 economic trends - interest rates impact analysis",
-      content:
-        "Q2 projection: Based on current economic trends and interest rate environment, expect 82% of forecasted targets. Action needed: Adjust spending by 15%. Focus on sectors with high resilience (4.2x growth potential).",
-      timestamp: new Date(Date.now() - 14 * 60 * 60 * 1000),
-      isRead: true,
-    },
-    {
-      id: "msg-8",
-      moduleId: "tax-compliance",
-      moduleName: "Tax and Compliance",
-      moduleIcon: "📋",
-      title: "2024 tax regulations update - compliance checklist",
-      content:
-        "New tax regulations effective Q3: Your business needs to implement enhanced documentation for 2 key areas. Schedule compliance review this quarter. Retention probability with intervention: 78% penalty avoidance.",
-      timestamp: new Date(Date.now() - 16 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-9",
-      moduleId: "market-analysis",
-      moduleName: "Market Analysis",
-      moduleIcon: "🌍",
-      title: "Market growth trending upward - 5% quarter-over-quarter",
-      content:
-        "Market analysis dashboard: Overall market growth improved to 5% quarter-over-quarter (+3% vs last quarter). Your market share position improved. Continue current strategy while monitoring competitor moves.",
-      timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000),
-      isRead: true,
-    },
-    {
-      id: "msg-10",
-      moduleId: "pricing-strategy",
-      moduleName: "Pricing Strategy",
-      moduleIcon: "💰",
-      title: "Price optimization - elasticity analysis suggests 8% increase",
-      content:
-        "Pricing analysis: 3 product lines show pricing optimization opportunities. Combined addressable revenue increase: $8.5M. Recommended approach: Pilot price increase on highest-margin segment with 2-week test period.",
-      timestamp: new Date(Date.now() - 20 * 60 * 60 * 1000),
-      isRead: false,
-    },
-    {
-      id: "msg-11",
-      moduleId: "inventory-supply",
-      moduleName: "Inventory and Supply Chain",
-      moduleIcon: "📦",
-      title: "Supply chain optimization - reduce lead times by 3 days",
-      content:
-        "Supply chain review: Current lead time: 12 days, industry average: 9 days. AI analysis suggests 3 key optimizations. Expected cost savings: 18%. ROI on implementation: 320% within 6 months.",
-      timestamp: new Date(Date.now() - 22 * 60 * 60 * 1000),
-      isRead: true,
-    },
-    {
-      id: "msg-12",
-      moduleId: "funding-loans",
-      moduleName: "Funding and Loan Hub",
-      moduleIcon: "🏦",
-      title: "Financing opportunity - $2M credit facility at favorable terms",
-      content:
-        "New financing option available: $2M credit facility approved at 6.2% APR. Perfect timing for expansion plans. Application deadline: 30 days. Impact: Can accelerate growth initiatives by 6 months.",
-      timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      isRead: false,
-    },
-  ]);
+  // Fetch advice messages from backend on component mount
+  useEffect(() => {
+    const fetchAdviceMessages = async () => {
+      try {
+        setIsLoading(true);
+        const messages = await listAdviceMessages();
+        setAdviceMessages(messages);
+      } catch (error) {
+        console.error("Failed to fetch advice messages:", error);
+        setAdviceMessages([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAdviceMessages();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -220,11 +110,19 @@ const AdviceHub = () => {
     scrollToBottom();
   }, [chatMessages]);
 
-  const handleMessageClick = (messageId: string) => {
+  const handleMessageClick = async (messageId: string) => {
     setSelectedMessageId(messageId);
     setIsSidebarOpen(false); // Close sidebar on mobile after selecting message
     const message = adviceMessages.find((m) => m.id === messageId);
     if (message) {
+      // Mark as read in backend
+      try {
+        await markAdviceAsRead(messageId);
+      } catch (error) {
+        console.error("Failed to mark message as read:", error);
+      }
+
+      // Update local state
       setAdviceMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, isRead: true } : m)),
       );
@@ -731,7 +629,12 @@ const AdviceHub = () => {
 
           {/* Messages Content */}
           <div className="flex-1 overflow-y-auto">
-            {filteredMessages.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3">
+                <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+                <p className="text-gray-600 font-medium">Loading advice...</p>
+              </div>
+            ) : filteredMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full">
                 <MessageCircle className="h-12 w-12 text-gray-300 mb-3" />
                 <p className="text-gray-600 font-medium">No messages</p>

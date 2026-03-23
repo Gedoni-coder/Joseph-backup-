@@ -33,59 +33,34 @@ export type EconomicIndicatorUpdateData = Partial<EconomicIndicatorCreateData>;
  * Get all economic indicator records
  */
 export async function getEconomicIndicatorRecords(): Promise<EconomicIndicatorData[]> {
-  try {
-    return await djangoGet<EconomicIndicatorData[]>("/api/economic/metrics/");
-  } catch (error) {
-    console.error("[Django API] Error fetching economic indicator records:", error);
-    return [];
-  }
+  return await djangoGet<EconomicIndicatorData[]>("/api/economic/metrics/");
 }
 
 /**
  * Get a specific economic indicator record by ID
  */
 export async function getEconomicIndicator(id: number): Promise<EconomicIndicatorData | null> {
-  try {
-    return await djangoGet<EconomicIndicatorData>(`/api/economic/metrics/${id}/`);
-  } catch (error) {
-    console.error(`[Django API] Error fetching economic indicator ${id}:`, error);
-    return null;
-  }
+  return await djangoGet<EconomicIndicatorData>(`/api/economic/metrics/${id}/`);
 }
 
 /**
  * Create a new economic indicator record
  */
 export async function createEconomicIndicator(data: EconomicIndicatorCreateData): Promise<EconomicIndicatorData | null> {
-  try {
-    return await djangoPost<EconomicIndicatorData>("/api/economic/metrics/", data);
-  } catch (error) {
-    console.error("[Django API] Error creating economic indicator:", error);
-    return null;
-  }
+  return await djangoPost<EconomicIndicatorData>("/api/economic/metrics/", data);
 }
 
 /**
  * Update an existing economic indicator record
  */
 export async function updateEconomicIndicator(id: number, data: EconomicIndicatorUpdateData): Promise<EconomicIndicatorData | null> {
-  try {
-    return await djangoPatch<EconomicIndicatorData>(`/api/economic/metrics/${id}/`, data);
-  } catch (error) {
-    console.error(`[Django API] Error updating economic indicator ${id}:`, error);
-    return null;
-  }
+  return await djangoPatch<EconomicIndicatorData>(`/api/economic/metrics/${id}/`, data);
 }
 
 /**
  * Delete an economic indicator record
  */
 export async function deleteEconomicIndicator(id: number): Promise<boolean> {
-  try {
-    await djangoDelete(`/api/economic/metrics/${id}/`);
-    return true;
-  } catch (error) {
-    console.error(`[Django API] Error deleting economic indicator ${id}:`, error);
-    return false;
-  }
+  await djangoDelete(`/api/economic/metrics/${id}/`);
+  return true;
 }

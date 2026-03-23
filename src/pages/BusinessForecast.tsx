@@ -18,24 +18,16 @@ import { ScenarioPlanningComponent } from "@/components/business/scenario-planni
 import { BusinessMetricsTable } from "@/components/business/business-metrics-table";
 import { FinancialLayout } from "@/components/business/financial-layout";
 import { DocumentsSection } from "@/components/business/documents-section";
+import { PricingStrategies } from "@/components/pricing/pricing-strategies";
 import { SummaryRecommendationSection } from "@/components/module/summary-recommendation-section";
 import { RevenueTargetsModal, type RevenueTargets } from "@/components/business/revenue-targets-modal";
 import {
-  BUSINESS_FORECAST_DEFAULTS,
   getSummaryContent,
   SUMMARY_DESCRIPTION,
   getRecommendationContent,
   RECOMMENDATION_DESCRIPTION,
-  DEFAULT_ACTION_ITEMS,
-  DEFAULT_NEXT_STEPS,
-  GROWTH_TRAJECTORY,
   getSummaryMetrics,
 } from "@/lib/business-forecast-content";
-import {
-  KEY_ASSUMPTIONS,
-  KEY_RISKS,
-  COMPETITIVE_METRICS,
-} from "@/mocks/business-forecast";
 import {
   Building2,
   RefreshCw,
@@ -67,6 +59,30 @@ const BusinessForecast = () => {
     scenarios,
     costStructure,
     cashFlowForecast,
+    keyAssumptions,
+    keyRisks,
+    competitiveMetrics,
+    actionItems,
+    nextSteps,
+    growthTrajectory,
+    revenueTargetData,
+    businessMetrics,
+    revenueProductServiceForecasts,
+    revenueRegionalForecasts,
+    revenueHistoricalComparisons,
+    revenueForecastMethods,
+    revenueScenarioSnapshots,
+    revenueSegmentBreakdowns,
+    costOverviewMetrics,
+    costBudgetScenarios,
+    costMonthlyComparisons,
+    operationalExpenseCategories,
+    operationalExpenseItems,
+    costTrendAnalyses,
+    overviewProfitLossSnapshots,
+    overviewKpiSummaries,
+    overviewAlerts,
+    alerts,
     lastUpdated,
     isLoading,
     error,
@@ -74,6 +90,7 @@ const BusinessForecast = () => {
     refreshData,
     updateKPI,
     updateScenario,
+    saveRevenueTargets,
     reconnect,
   } = useBusinessForecastingData();
 
@@ -81,32 +98,41 @@ const BusinessForecast = () => {
   const [showRevenueModal, setShowRevenueModal] = useState(false);
   const [revenueTargets, setRevenueTargets] = useState<RevenueTargets | null>(null);
 
-  // Load revenue targets from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("joseph:revenueTargets");
-    if (saved) {
-      try {
-        setRevenueTargets(JSON.parse(saved));
-      } catch (error) {
-        console.error("Failed to load revenue targets:", error);
-      }
+    if (revenueTargetData) {
+      setRevenueTargets({
+        annualRevenue: revenueTargetData.annualRevenue,
+        monthlyRevenue: revenueTargetData.monthlyTarget,
+        q1Revenue: revenueTargetData.q1Revenue,
+        q2Revenue: revenueTargetData.q2Revenue,
+        q3Revenue: revenueTargetData.q3Revenue,
+        q4Revenue: revenueTargetData.q4Revenue,
+      });
     }
-  }, []);
+  }, [revenueTargetData]);
 
   // Auto-popup modal for new users (3 seconds after page load)
   useEffect(() => {
-    const isNewUser = !localStorage.getItem("joseph:revenueTargets");
+    const isNewUser = !revenueTargetData;
     if (isNewUser) {
       const timer = setTimeout(() => {
         setShowRevenueModal(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [revenueTargetData]);
 
-  const handleSaveRevenueTargets = (targets: RevenueTargets) => {
+  const handleSaveRevenueTargets = async (targets: RevenueTargets) => {
     setRevenueTargets(targets);
-    localStorage.setItem("joseph:revenueTargets", JSON.stringify(targets));
+    await saveRevenueTargets({
+      id: revenueTargetData?.id,
+      annualRevenue: targets.annualRevenue,
+      monthlyRevenue: targets.monthlyRevenue,
+      q1Revenue: targets.q1Revenue,
+      q2Revenue: targets.q2Revenue,
+      q3Revenue: targets.q3Revenue,
+      q4Revenue: targets.q4Revenue,
+    });
   };
 
   const handleRefresh = async () => {
@@ -142,13 +168,15 @@ const BusinessForecast = () => {
                       Annual Revenue Target
                     </div>
                     <div className="text-lg font-bold">
-                      {revenueTargets
+{revenueTargets
                         ? formatCurrency(revenueTargets.annualRevenue)
-                        : formatCurrency(parseFloat(BUSINESS_FORECAST_DEFAULTS.ANNUAL_REVENUE_TARGET.replace(/[^\d.-]/g, '')))}
+                        : revenueTargetData
+                          ? formatCurrency(revenueTargetData.annualRevenue)
+                        : "Not set"}
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {revenueTargets ? "Set" : "Click to set"}
+                    {revenueTargets || revenueTargetData ? "Set" : "Click to set"}
                   </Badge>
                 </div>
               </CardContent>
@@ -250,6 +278,12 @@ const BusinessForecast = () => {
                   className="w-full justify-center data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
                 >
                   Analytics
+                </TabsTrigger>
+                <TabsTrigger
+                  value="pricing"
+                  className="w-full justify-center data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
+                  Pricing
                 </TabsTrigger>
                 <TabsTrigger
                   value="documents"
@@ -453,59 +487,51 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {(() => {
-                        const totalRevenue = revenueProjections.reduce((sum, p) => sum + (p.projected || 0), 0);
-                        const cogsTotal = costStructure.filter(c => c.type === "COGS").reduce((sum, c) => sum + c.amount, 0);
-                        const operatingTotal = costStructure.filter(c => c.type === "Operating").reduce((sum, c) => sum + c.amount, 0);
-                        const grossProfit = totalRevenue - cogsTotal;
-                        const netProfit = grossProfit - operatingTotal;
-                        const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
-                        const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
-                        
-                        return (
-                          <>
-                            <Card className="p-4">
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-muted-foreground">
-                                  Gross Profit
-                                </h4>
-                                <div className="text-3xl font-bold text-economic-positive">
-                                  {formatCurrency(grossProfit)}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {grossMargin.toFixed(1)}% margin (After COGS)
-                                </p>
+                      {overviewProfitLossSnapshots.length > 0 ? (
+                        <>
+                          <Card className="p-4">
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium text-muted-foreground">
+                                Gross Profit
+                              </h4>
+                              <div className="text-3xl font-bold text-economic-positive">
+                                {formatCurrency(overviewProfitLossSnapshots[0].grossProfit)}
                               </div>
-                            </Card>
-                            <Card className="p-4">
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-muted-foreground">
-                                  Operating Expense
-                                </h4>
-                                <div className="text-3xl font-bold text-economic-negative">
-                                  {formatCurrency(operatingTotal)}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  Annual overhead
-                                </p>
+                              <p className="text-xs text-muted-foreground">
+                                {overviewProfitLossSnapshots[0].grossMargin.toFixed(1)}% margin (After COGS)
+                              </p>
+                            </div>
+                          </Card>
+                          <Card className="p-4">
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium text-muted-foreground">
+                                Operating Expense
+                              </h4>
+                              <div className="text-3xl font-bold text-economic-negative">
+                                {formatCurrency(overviewProfitLossSnapshots[0].operatingExpense)}
                               </div>
-                            </Card>
-                            <Card className="p-4">
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-muted-foreground">
-                                  Net Profit
-                                </h4>
-                                <div className={`text-3xl font-bold ${netProfit >= 0 ? 'text-economic-positive' : 'text-economic-negative'}`}>
-                                  {formatCurrency(netProfit)}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {netMargin.toFixed(1)}% margin (Bottom line)
-                                </p>
+                              <p className="text-xs text-muted-foreground">
+                                Annual overhead
+                              </p>
+                            </div>
+                          </Card>
+                          <Card className="p-4">
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium text-muted-foreground">
+                                Net Profit
+                              </h4>
+                              <div className={`text-3xl font-bold ${overviewProfitLossSnapshots[0].netProfit >= 0 ? 'text-economic-positive' : 'text-economic-negative'}`}>
+                                {formatCurrency(overviewProfitLossSnapshots[0].netProfit)}
                               </div>
-                            </Card>
-                          </>
-                        );
-                      })()}
+                              <p className="text-xs text-muted-foreground">
+                                {overviewProfitLossSnapshots[0].netMargin.toFixed(1)}% margin (Bottom line)
+                              </p>
+                            </div>
+                          </Card>
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No profit/loss snapshot available.</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -521,6 +547,30 @@ const BusinessForecast = () => {
                     kpis={kpis.slice(0, 6)}
                     title="Key Performance Indicators"
                   />
+                  {overviewKpiSummaries.length > 0 && (
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Metrics Tracked</p>
+                        <p className="text-xl font-bold">{overviewKpiSummaries[0].metricsTracked}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Excellent</p>
+                        <p className="text-xl font-bold">{overviewKpiSummaries[0].excellentCount}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Good</p>
+                        <p className="text-xl font-bold">{overviewKpiSummaries[0].goodCount}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Fair</p>
+                        <p className="text-xl font-bold">{overviewKpiSummaries[0].fairCount}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Needs Attention</p>
+                        <p className="text-xl font-bold">{overviewKpiSummaries[0].needsAttentionCount}</p>
+                      </Card>
+                    </div>
+                  )}
                 </LoadingOverlay>
               </section>
 
@@ -535,44 +585,24 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <div className="flex items-start gap-3 p-3 bg-white rounded border border-orange-200">
-                        <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-orange-900">
-                            Revenue Below Target
-                          </h4>
-                          <p className="text-xs text-orange-800 mt-1">
-                            Current projection is slightly below annual target.
-                            Review customer segment assumptions.
-                          </p>
+                      {overviewAlerts.map((alert) => (
+                        <div key={`${alert.type}-${alert.title}`} className="flex items-start gap-3 p-3 bg-white rounded border border-orange-200">
+                          <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-sm text-orange-900">
+                              {alert.title}
+                            </h4>
+                            <p className="text-xs text-orange-800 mt-1">
+                              {alert.description}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 p-3 bg-white rounded border border-orange-200">
-                        <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-orange-900">
-                            Cash Flow Variability
-                          </h4>
-                          <p className="text-xs text-orange-800 mt-1">
-                            Q2 and Q3 show significant fluctuations. Consider
-                            adjusting payment terms.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3 p-3 bg-white rounded border border-orange-200">
-                        <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-orange-900">
-                            Cost Increase Trend
-                          </h4>
-                          <p className="text-xs text-orange-800 mt-1">
-                            Operating expenses trending upward. Monitor cost
-                            structure closely.
-                          </p>
-                        </div>
-                      </div>
+                      ))}
+                      {!overviewAlerts.length && (
+                        <p className="text-sm text-muted-foreground">
+                          No alerts at this time.
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -597,24 +627,34 @@ const BusinessForecast = () => {
                   customerProfiles.length,
                   scenarios.length,
                   kpis.length,
+                  revenueTargets
+                    ? formatCurrency(revenueTargets.annualRevenue)
+                    : revenueTargetData
+                    ? formatCurrency(revenueTargetData.annualRevenue)
+                    : "Not set",
                 )}
                 summaryMetrics={getSummaryMetrics(
                   customerProfiles.length,
                   kpis.length,
                   scenarios.length,
+                  revenueTargets
+                    ? formatCurrency(revenueTargets.annualRevenue)
+                    : revenueTargetData
+                    ? formatCurrency(revenueTargetData.annualRevenue)
+                    : "Not set",
                 )}
                 recommendationTitle="Business Forecast Recommendations"
                 recommendationDescription={RECOMMENDATION_DESCRIPTION}
                 recommendationText={getRecommendationContent()}
-                actionItems={DEFAULT_ACTION_ITEMS}
-                nextSteps={DEFAULT_NEXT_STEPS}
+                actionItems={actionItems}
+                nextSteps={nextSteps}
               />
             </TabsContent>
 
             <TabsContent value="tables" className="space-y-8">
               {/* Business Metrics Table */}
               <section>
-                <BusinessMetricsTable />
+                <BusinessMetricsTable metrics={businessMetrics} />
               </section>
 
               {/* Financial Layout Metrics */}
@@ -664,127 +704,33 @@ const BusinessForecast = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            Core Platform
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                2025 Projection
-                              </span>
-                              <span className="font-bold">$5.2M</span>
+                    {revenueProductServiceForecasts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No product/service forecast data found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {revenueProductServiceForecasts.map((item) => (
+                          <Card key={item.id} className="p-4">
+                            <div className="space-y-3">
+                              <h4 className="font-semibold text-sm">{item.name}</h4>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">{item.projection_year} Projection</span>
+                                  <span className="font-bold">{formatCurrency(item.projected_revenue)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Growth Rate</span>
+                                  <span className="font-bold text-economic-positive">+{item.growth_rate}%</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">Market Share</span>
+                                  <span className="font-bold">{item.market_share}%</span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Growth Rate
-                              </span>
-                              <span className="font-bold text-economic-positive">
-                                +18%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Market Share
-                              </span>
-                              <span className="font-bold">42%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            Premium Tier
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                2025 Projection
-                              </span>
-                              <span className="font-bold">$3.1M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Growth Rate
-                              </span>
-                              <span className="font-bold text-economic-positive">
-                                +28%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Market Share
-                              </span>
-                              <span className="font-bold">25%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            Professional Services
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                2025 Projection
-                              </span>
-                              <span className="font-bold">$2.8M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Growth Rate
-                              </span>
-                              <span className="font-bold text-economic-positive">
-                                +22%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Market Share
-                              </span>
-                              <span className="font-bold">23%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            Support & Maintenance
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                2025 Projection
-                              </span>
-                              <span className="font-bold">$2.6M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Growth Rate
-                              </span>
-                              <span className="font-bold text-economic-positive">
-                                +15%
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">
-                                Market Share
-                              </span>
-                              <span className="font-bold">10%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </section>
@@ -804,57 +750,25 @@ const BusinessForecast = () => {
                         <h4 className="font-semibold text-sm mb-3">
                           By Geographic Region
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <Card className="p-4">
-                            <div className="space-y-2">
-                              <h5 className="font-medium text-sm">
-                                North America
-                              </h5>
-                              <div className="text-2xl font-bold">$6.5M</div>
-                              <p className="text-xs text-muted-foreground">
-                                52% of revenue
-                              </p>
-                              <div className="flex justify-between text-xs mt-2">
-                                <span>Growth:</span>
-                                <span className="text-economic-positive font-bold">
-                                  +14%
-                                </span>
-                              </div>
-                            </div>
-                          </Card>
-                          <Card className="p-4">
-                            <div className="space-y-2">
-                              <h5 className="font-medium text-sm">Europe</h5>
-                              <div className="text-2xl font-bold">$3.8M</div>
-                              <p className="text-xs text-muted-foreground">
-                                30% of revenue
-                              </p>
-                              <div className="flex justify-between text-xs mt-2">
-                                <span>Growth:</span>
-                                <span className="text-economic-positive font-bold">
-                                  +22%
-                                </span>
-                              </div>
-                            </div>
-                          </Card>
-                          <Card className="p-4">
-                            <div className="space-y-2">
-                              <h5 className="font-medium text-sm">
-                                Asia-Pacific
-                              </h5>
-                              <div className="text-2xl font-bold">$2.4M</div>
-                              <p className="text-xs text-muted-foreground">
-                                18% of revenue
-                              </p>
-                              <div className="flex justify-between text-xs mt-2">
-                                <span>Growth:</span>
-                                <span className="text-economic-positive font-bold">
-                                  +38%
-                                </span>
-                              </div>
-                            </div>
-                          </Card>
-                        </div>
+                        {revenueRegionalForecasts.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No geographic forecast data found.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {revenueRegionalForecasts.map((region) => (
+                              <Card key={region.id} className="p-4">
+                                <div className="space-y-2">
+                                  <h5 className="font-medium text-sm">{region.region}</h5>
+                                  <div className="text-2xl font-bold">{formatCurrency(region.projected_revenue)}</div>
+                                  <p className="text-xs text-muted-foreground">{region.revenue_share}% of revenue</p>
+                                  <div className="flex justify-between text-xs mt-2">
+                                    <span>Growth:</span>
+                                    <span className="text-economic-positive font-bold">+{region.growth_rate}%</span>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -908,55 +822,33 @@ const BusinessForecast = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card className="p-4 bg-muted/30">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            2024 Performance
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm">Total Revenue</span>
-                              <span className="font-bold">$11.2M</span>
+                    {revenueHistoricalComparisons.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No historical comparison data found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {revenueHistoricalComparisons.map((item, idx) => (
+                          <Card key={item.id} className={`p-4 ${idx === 0 ? 'bg-muted/30' : 'bg-blue-50'}`}>
+                            <div className="space-y-3">
+                              <h4 className="font-semibold text-sm">{item.label}</h4>
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-sm">Total Revenue</span>
+                                  <span className="font-bold">{formatCurrency(item.total_revenue)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm">{item.growth_label}</span>
+                                  <span className="font-bold text-economic-positive">+{item.growth_percent}%</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm">{item.supporting_metric_label}</span>
+                                  <span className="font-bold">{item.supporting_metric_value}</span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">YoY Growth</span>
-                              <span className="font-bold text-economic-positive">
-                                +16%
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Q4 Actual</span>
-                              <span className="font-bold">$3.1M</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4 bg-blue-50">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">
-                            2025 Projection
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm">Total Revenue</span>
-                              <span className="font-bold">$13.7M</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Projected Growth</span>
-                              <span className="font-bold text-economic-positive">
-                                +22%
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Confidence Level</span>
-                              <span className="font-bold">80%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    </div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </section>
@@ -971,89 +863,34 @@ const BusinessForecast = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="border rounded-lg p-4">
-                          <h4 className="font-semibold text-sm mb-2">
-                            Linear Regression
-                          </h4>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Baseline trend assuming steady growth
-                          </p>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>2025 Projection</span>
-                              <span className="font-bold">$13.2M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>R² Score</span>
-                              <span className="font-bold">0.92</span>
-                            </div>
+                    {revenueForecastMethods.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No forecasting method data found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {[0, 1].map((column) => (
+                          <div key={column} className="space-y-4">
+                            {revenueForecastMethods
+                              .filter((_, idx) => idx % 2 === column)
+                              .map((method) => (
+                                <div key={method.id} className="border rounded-lg p-4">
+                                  <h4 className="font-semibold text-sm mb-2">{method.name}</h4>
+                                  <p className="text-xs text-muted-foreground mb-3">{method.description}</p>
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                      <span>2025 Projection</span>
+                                      <span className="font-bold">{formatCurrency(method.projected_revenue)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span>{method.metric_label}</span>
+                                      <span className="font-bold">{method.metric_value}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                           </div>
-                        </div>
-
-                        <div className="border rounded-lg p-4">
-                          <h4 className="font-semibold text-sm mb-2">
-                            Moving Average (12-Month)
-                          </h4>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Smoothed trend accounting for seasonality
-                          </p>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>2025 Projection</span>
-                              <span className="font-bold">$13.5M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Trend Direction</span>
-                              <span className="font-bold text-economic-positive">
-                                ↗ Up
-                              </span>
-                            </div>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-
-                      <div className="space-y-4">
-                        <div className="border rounded-lg p-4">
-                          <h4 className="font-semibold text-sm mb-2">
-                            Exponential Smoothing
-                          </h4>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Recent data weighted more heavily
-                          </p>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>2025 Projection</span>
-                              <span className="font-bold">$13.9M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>α Parameter</span>
-                              <span className="font-bold">0.15</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="border rounded-lg p-4">
-                          <h4 className="font-semibold text-sm mb-2">
-                            AI-Based Prediction
-                          </h4>
-                          <p className="text-xs text-muted-foreground mb-3">
-                            Machine learning model incorporating market factors
-                          </p>
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-sm">
-                              <span>2025 Projection</span>
-                              <span className="font-bold">$14.1M</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span>Model Accuracy</span>
-                              <span className="font-bold">87%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </section>
@@ -1138,63 +975,44 @@ const BusinessForecast = () => {
                           </div>
                         </Card>
                       ))}
-                      <Card className="p-4 border-2 border-destructive/30">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-sm">
-                              Worst Case
-                            </h4>
-                            <Badge
-                              variant="outline"
-                              className="border-destructive text-destructive"
-                            >
-                              25%
-                            </Badge>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="border-t pt-2">
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Annual Revenue
-                              </p>
-                              <p className="text-2xl font-bold">$11.8M</p>
+                      {revenueScenarioSnapshots.map((snapshot) => (
+                        <Card key={snapshot.id} className="p-4 border-2 border-destructive/30">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">{snapshot.scenario}</h4>
+                              <Badge variant="outline" className="border-destructive text-destructive">
+                                {snapshot.probability}%
+                              </Badge>
                             </div>
 
-                            <div className="border-t pt-2">
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Operating Costs
-                              </p>
-                              <p className="font-bold">$9.8M</p>
-                            </div>
+                            <div className="space-y-2">
+                              <div className="border-t pt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Annual Revenue</p>
+                                <p className="text-2xl font-bold">{formatCurrency(snapshot.annual_revenue)}</p>
+                              </div>
 
-                            <div className="border-t pt-2">
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Net Profit
-                              </p>
-                              <p className="text-lg font-bold text-economic-negative">
-                                $2.0M
-                              </p>
-                            </div>
+                              <div className="border-t pt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Operating Costs</p>
+                                <p className="font-bold">{formatCurrency(snapshot.operating_costs)}</p>
+                              </div>
 
-                            <div className="border-t pt-2">
-                              <p className="text-xs font-semibold mb-1">
-                                Key Assumptions
-                              </p>
-                              <ul className="text-xs space-y-1">
-                                <li className="text-muted-foreground">
-                                  • Market slowdown
-                                </li>
-                                <li className="text-muted-foreground">
-                                  • Increased competition
-                                </li>
-                                <li className="text-muted-foreground">
-                                  • Customer churn
-                                </li>
-                              </ul>
+                              <div className="border-t pt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Net Profit</p>
+                                <p className="text-lg font-bold text-economic-negative">{formatCurrency(snapshot.net_profit)}</p>
+                              </div>
+
+                              <div className="border-t pt-2">
+                                <p className="text-xs font-semibold mb-1">Key Assumptions</p>
+                                <ul className="text-xs space-y-1">
+                                  {snapshot.key_assumptions.map((item: string, idx: number) => (
+                                    <li key={idx} className="text-muted-foreground">• {item}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Card>
+                        </Card>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -1221,61 +1039,39 @@ const BusinessForecast = () => {
                         <h4 className="font-semibold text-sm mb-4">
                           By Customer Segment
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <Card className="p-5 border-l-4 border-l-blue-500 bg-blue-50/50">
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-sm text-blue-900">
-                                Enterprise
-                              </h5>
-                              <div className="text-3xl font-bold text-blue-600">
-                                $2.0M
-                              </div>
-                              <div className="space-y-2 text-xs text-muted-foreground">
-                                <div className="flex justify-between">
-                                  <span>% of Total Revenue:</span>
-                                  <span className="font-medium">45%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Growth Rate:</span>
-                                  <span className="font-medium text-economic-positive">
-                                    +28%
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Customer Count:</span>
-                                  <span className="font-medium">12</span>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-
-                          <Card className="p-5 border-l-4 border-l-emerald-500 bg-emerald-50/50">
-                            <div className="space-y-3">
-                              <h5 className="font-semibold text-sm text-emerald-900">
-                                SMB
-                              </h5>
-                              <div className="text-3xl font-bold text-emerald-600">
-                                $0.3M
-                              </div>
-                              <div className="space-y-2 text-xs text-muted-foreground">
-                                <div className="flex justify-between">
-                                  <span>% of Total Revenue:</span>
-                                  <span className="font-medium">6%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Growth Rate:</span>
-                                  <span className="font-medium text-economic-positive">
-                                    +15%
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Customer Count:</span>
-                                  <span className="font-medium">87</span>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        </div>
+                        {revenueSegmentBreakdowns.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No segment breakdown data found.</p>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {revenueSegmentBreakdowns.map((segment, idx) => {
+                              const leftAccent = idx % 2 === 0 ? 'border-l-blue-500 bg-blue-50/50' : 'border-l-emerald-500 bg-emerald-50/50';
+                              const headingColor = idx % 2 === 0 ? 'text-blue-900' : 'text-emerald-900';
+                              const valueColor = idx % 2 === 0 ? 'text-blue-600' : 'text-emerald-600';
+                              return (
+                                <Card key={segment.id} className={`p-5 border-l-4 ${leftAccent}`}>
+                                  <div className="space-y-3">
+                                    <h5 className={`font-semibold text-sm ${headingColor}`}>{segment.segment}</h5>
+                                    <div className={`text-3xl font-bold ${valueColor}`}>{formatCurrency(segment.revenue)}</div>
+                                    <div className="space-y-2 text-xs text-muted-foreground">
+                                      <div className="flex justify-between">
+                                        <span>% of Total Revenue:</span>
+                                        <span className="font-medium">{segment.percentage_of_total}%</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span>Growth Rate:</span>
+                                        <span className="font-medium text-economic-positive">+{segment.growth_rate}%</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span>Customer Count:</span>
+                                        <span className="font-medium">{segment.customer_count}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       {/* Growth Trajectory */}
@@ -1284,61 +1080,30 @@ const BusinessForecast = () => {
                           Growth Trajectory
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                          <Card className="p-4 border-2 border-amber-100">
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-xs text-amber-900">
-                                Q1 2025
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                Foundation building phase
-                              </p>
-                              <div className="text-xl font-bold text-amber-600 mt-2">
-                                $3.0M
-                              </div>
-                            </div>
-                          </Card>
-
-                          <Card className="p-4 border-2 border-blue-100">
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-xs text-blue-900">
-                                Q2 2025
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                Accelerated growth period
-                              </p>
-                              <div className="text-xl font-bold text-blue-600 mt-2">
-                                $3.3M
-                              </div>
-                            </div>
-                          </Card>
-
-                          <Card className="p-4 border-2 border-purple-100">
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-xs text-purple-900">
-                                Q3 2025
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                Market expansion phase
-                              </p>
-                              <div className="text-xl font-bold text-purple-600 mt-2">
-                                $3.6M
-                              </div>
-                            </div>
-                          </Card>
-
-                          <Card className="p-4 border-2 border-green-100">
-                            <div className="space-y-2">
-                              <h5 className="font-semibold text-xs text-green-900">
-                                Q4 2025
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                Optimization and scaling
-                              </p>
-                              <div className="text-xl font-bold text-green-600 mt-2">
-                                $3.8M
-                              </div>
-                            </div>
-                          </Card>
+                          {growthTrajectory.map((item, idx) => {
+                            const colors = [
+                              { border: 'border-amber-100', heading: 'text-amber-900', value: 'text-amber-600' },
+                              { border: 'border-blue-100', heading: 'text-blue-900', value: 'text-blue-600' },
+                              { border: 'border-purple-100', heading: 'text-purple-900', value: 'text-purple-600' },
+                              { border: 'border-green-100', heading: 'text-green-900', value: 'text-green-600' },
+                            ];
+                            const color = colors[idx % colors.length];
+                            return (
+                              <Card key={idx} className={`p-4 border-2 ${color.border}`}>
+                                <div className="space-y-2">
+                                  <h5 className={`font-semibold text-xs ${color.heading}`}>
+                                    {item.quarter}
+                                  </h5>
+                                  <p className="text-sm text-muted-foreground">
+                                    {item.description}
+                                  </p>
+                                  <div className={`text-xl font-bold ${color.value} mt-2`}>
+                                    {formatCurrency(item.revenueTarget)}
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -1386,71 +1151,77 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Card className="p-4 border-2 border-orange-200 bg-orange-50">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm text-orange-900">
-                            Fixed Costs
-                          </h4>
-                          <p className="text-xs text-orange-800">
-                            Rent, salaries, subscriptions, insurance
-                          </p>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm">Annual Total</span>
-                              <span className="font-bold text-lg">$3.2M</span>
+                      {costOverviewMetrics.map((metric) => {
+                        const fixed = metric.costType === "fixed";
+                        return (
+                          <Card
+                            key={metric.id}
+                            className={`p-4 border-2 ${
+                              fixed
+                                ? "border-orange-200 bg-orange-50"
+                                : "border-purple-200 bg-purple-50"
+                            }`}
+                          >
+                            <div className="space-y-3">
+                              <h4
+                                className={`font-semibold text-sm ${
+                                  fixed ? "text-orange-900" : "text-purple-900"
+                                }`}
+                              >
+                                {fixed ? "Fixed Costs" : "Variable Costs"}
+                              </h4>
+                              <p
+                                className={`text-xs ${
+                                  fixed ? "text-orange-800" : "text-purple-800"
+                                }`}
+                              >
+                                {metric.description}
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-sm">Annual Total</span>
+                                  <span className="font-bold text-lg">
+                                    {formatCurrency(metric.annualTotal)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm">Monthly Avg</span>
+                                  <span className="font-bold">
+                                    {formatCurrency(metric.monthlyAverage)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-sm">% of Revenue</span>
+                                  <span className="font-bold">
+                                    {metric.percentOfRevenue}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="border-t pt-2 mt-2">
+                                <div className="flex items-center gap-2">
+                                  <TrendingUp
+                                    className={`h-4 w-4 ${
+                                      fixed ? "text-orange-600" : "text-purple-600"
+                                    }`}
+                                  />
+                                  <span
+                                    className={`text-xs font-semibold ${
+                                      fixed ? "text-orange-800" : "text-purple-800"
+                                    }`}
+                                  >
+                                    {metric.insight}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Monthly Avg</span>
-                              <span className="font-bold">$267K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">% of Revenue</span>
-                              <span className="font-bold">23%</span>
-                            </div>
-                          </div>
-                          <div className="border-t pt-2 mt-2">
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="h-4 w-4 text-orange-600" />
-                              <span className="text-xs text-orange-800 font-semibold">
-                                Stable and predictable
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4 border-2 border-purple-200 bg-purple-50">
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm text-purple-900">
-                            Variable Costs
-                          </h4>
-                          <p className="text-xs text-purple-800">
-                            Raw materials, commissions, production costs
-                          </p>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm">Annual Total</span>
-                              <span className="font-bold text-lg">$5.1M</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">Monthly Avg</span>
-                              <span className="font-bold">$425K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm">% of Revenue</span>
-                              <span className="font-bold">37%</span>
-                            </div>
-                          </div>
-                          <div className="border-t pt-2 mt-2">
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="h-4 w-4 text-purple-600" />
-                              <span className="text-xs text-purple-800 font-semibold">
-                                Scales with revenue
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
+                          </Card>
+                        );
+                      })}
+                      {!costOverviewMetrics.length && (
+                        <p className="text-sm text-muted-foreground">
+                          No cost overview metrics available.
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1528,47 +1299,50 @@ const BusinessForecast = () => {
                   <CardContent>
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card className="p-4 bg-blue-50">
-                          <div className="space-y-2">
-                            <h5 className="font-semibold text-sm text-blue-900">
-                              Budget 2025
-                            </h5>
-                            <div className="text-3xl font-bold text-blue-600">
-                              $8.8M
-                            </div>
-                            <p className="text-xs text-blue-800">
-                              Target spending
-                            </p>
-                          </div>
-                        </Card>
+                        {costBudgetScenarios.map((scenario) => {
+                          const key = scenario.label.toLowerCase();
+                          const cardClasses = key.includes("budget")
+                            ? "bg-blue-50"
+                            : key.includes("variance")
+                            ? "bg-green-50"
+                            : "bg-purple-50";
+                          const titleClasses = key.includes("budget")
+                            ? "text-blue-900"
+                            : key.includes("variance")
+                            ? "text-green-900"
+                            : "text-purple-900";
+                          const valueClasses = key.includes("budget")
+                            ? "text-blue-600"
+                            : key.includes("variance")
+                            ? "text-green-600"
+                            : "text-purple-600";
+                          const subtitleClasses = key.includes("budget")
+                            ? "text-blue-800"
+                            : key.includes("variance")
+                            ? "text-green-800"
+                            : "text-purple-800";
 
-                        <Card className="p-4 bg-purple-50">
-                          <div className="space-y-2">
-                            <h5 className="font-semibold text-sm text-purple-900">
-                              Forecast 2025
-                            </h5>
-                            <div className="text-3xl font-bold text-purple-600">
-                              $8.3M
-                            </div>
-                            <p className="text-xs text-purple-800">
-                              Projected spending
-                            </p>
-                          </div>
-                        </Card>
-
-                        <Card className="p-4 bg-green-50">
-                          <div className="space-y-2">
-                            <h5 className="font-semibold text-sm text-green-900">
-                              Variance
-                            </h5>
-                            <div className="text-3xl font-bold text-green-600">
-                              +$500K
-                            </div>
-                            <p className="text-xs text-green-800">
-                              Under budget (5.7%)
-                            </p>
-                          </div>
-                        </Card>
+                          return (
+                            <Card key={scenario.id} className={`p-4 ${cardClasses}`}>
+                              <div className="space-y-2">
+                                <h5 className={`font-semibold text-sm ${titleClasses}`}>
+                                  {scenario.label}
+                                </h5>
+                                <div className={`text-3xl font-bold ${valueClasses}`}>
+                                  {formatCurrency(scenario.amount)}
+                                </div>
+                                <p className={`text-xs ${subtitleClasses}`}>
+                                  {scenario.subtitle || scenario.note}
+                                </p>
+                              </div>
+                            </Card>
+                          );
+                        })}
+                        {!costBudgetScenarios.length && (
+                          <p className="text-sm text-muted-foreground">
+                            No budget scenarios available.
+                          </p>
+                        )}
                       </div>
 
                       <div className="border rounded-lg p-4 space-y-4">
@@ -1576,32 +1350,7 @@ const BusinessForecast = () => {
                           Monthly Comparison
                         </h4>
                         <div className="space-y-3">
-                          {[
-                            {
-                              month: "January",
-                              budget: 750,
-                              forecast: 680,
-                              actual: 690,
-                            },
-                            {
-                              month: "February",
-                              budget: 750,
-                              forecast: 720,
-                              actual: 750,
-                            },
-                            {
-                              month: "March",
-                              budget: 750,
-                              forecast: 700,
-                              actual: 680,
-                            },
-                            {
-                              month: "April",
-                              budget: 750,
-                              forecast: 710,
-                              actual: null,
-                            },
-                          ].map((row) => (
+                          {costMonthlyComparisons.map((row) => (
                             <div key={row.month} className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm">
@@ -1615,7 +1364,7 @@ const BusinessForecast = () => {
                                   </Badge>
                                   <div className="flex-1">
                                     <div className="h-6 bg-blue-200 rounded flex items-center justify-center text-xs font-semibold">
-                                      ${row.budget}K
+                                      ${(row.budgetAmount / 1000).toFixed(0)}K
                                     </div>
                                   </div>
                                 </div>
@@ -1625,11 +1374,11 @@ const BusinessForecast = () => {
                                   </Badge>
                                   <div className="flex-1">
                                     <div className="h-6 bg-purple-200 rounded flex items-center justify-center text-xs font-semibold">
-                                      ${row.forecast}K
+                                      ${(row.forecastAmount / 1000).toFixed(0)}K
                                     </div>
                                   </div>
                                 </div>
-                                {row.actual && (
+                                {row.actualAmount !== null && (
                                   <div className="flex-1 flex items-center gap-2">
                                     <Badge
                                       variant="outline"
@@ -1639,7 +1388,7 @@ const BusinessForecast = () => {
                                     </Badge>
                                     <div className="flex-1">
                                       <div className="h-6 bg-green-200 rounded flex items-center justify-center text-xs font-semibold">
-                                        ${row.actual}K
+                                        ${(row.actualAmount / 1000).toFixed(0)}K
                                       </div>
                                     </div>
                                   </div>
@@ -1647,6 +1396,11 @@ const BusinessForecast = () => {
                               </div>
                             </div>
                           ))}
+                          {!costMonthlyComparisons.length && (
+                            <p className="text-sm text-muted-foreground">
+                              No monthly cost comparisons available.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1665,133 +1419,49 @@ const BusinessForecast = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <Card className="p-4 border-l-4 border-l-blue-500">
-                        <div className="space-y-3">
-                          <h5 className="font-semibold text-sm">
-                            Marketing & Sales
-                          </h5>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Digital Marketing
-                              </span>
-                              <span className="font-bold">$480K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Sales Team Salaries
-                              </span>
-                              <span className="font-bold">$620K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Events & Conferences
-                              </span>
-                              <span className="font-bold">$150K</span>
-                            </div>
-                            <div className="border-t pt-2 flex justify-between font-bold">
-                              <span>Total</span>
-                              <span>$1.25M</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
+                      {operationalExpenseCategories.map((category, index) => {
+                        const borderColors = [
+                          "border-l-blue-500",
+                          "border-l-purple-500",
+                          "border-l-orange-500",
+                          "border-l-green-500",
+                        ];
+                        const categoryItems = operationalExpenseItems.filter(
+                          (item) => item.categoryId === category.id,
+                        );
 
-                      <Card className="p-4 border-l-4 border-l-purple-500">
-                        <div className="space-y-3">
-                          <h5 className="font-semibold text-sm">
-                            Research & Development
-                          </h5>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                R&D Team Salaries
-                              </span>
-                              <span className="font-bold">$850K</span>
+                        return (
+                          <Card
+                            key={category.id}
+                            className={`p-4 border-l-4 ${borderColors[index % borderColors.length]}`}
+                          >
+                            <div className="space-y-3">
+                              <h5 className="font-semibold text-sm">{category.name}</h5>
+                              <div className="space-y-2">
+                                {categoryItems.map((item) => (
+                                  <div key={item.id} className="flex justify-between">
+                                    <span className="text-sm text-muted-foreground">
+                                      {item.name}
+                                    </span>
+                                    <span className="font-bold">
+                                      {formatCurrency(item.amount)}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="border-t pt-2 flex justify-between font-bold">
+                                  <span>Total</span>
+                                  <span>{formatCurrency(category.totalAmount)}</span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Tools & Infrastructure
-                              </span>
-                              <span className="font-bold">$220K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Licenses & Software
-                              </span>
-                              <span className="font-bold">$180K</span>
-                            </div>
-                            <div className="border-t pt-2 flex justify-between font-bold">
-                              <span>Total</span>
-                              <span>$1.25M</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4 border-l-4 border-l-orange-500">
-                        <div className="space-y-3">
-                          <h5 className="font-semibold text-sm">
-                            General & Administrative
-                          </h5>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Office Rent
-                              </span>
-                              <span className="font-bold">$360K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Admin Staff Salaries
-                              </span>
-                              <span className="font-bold">$420K</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Utilities & Services
-                              </span>
-                              <span className="font-bold">$140K</span>
-                            </div>
-                            <div className="border-t pt-2 flex justify-between font-bold">
-                              <span>Total</span>
-                              <span>$0.92M</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4 border-l-4 border-l-green-500">
-                        <div className="space-y-3">
-                          <h5 className="font-semibold text-sm">
-                            Forecasted COGS
-                          </h5>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Raw Materials
-                              </span>
-                              <span className="font-bold">$2.1M</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Manufacturing
-                              </span>
-                              <span className="font-bold">$1.8M</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-muted-foreground">
-                                Shipping & Logistics
-                              </span>
-                              <span className="font-bold">$620K</span>
-                            </div>
-                            <div className="border-t pt-2 flex justify-between font-bold">
-                              <span>Total</span>
-                              <span>$4.52M</span>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
+                          </Card>
+                        );
+                      })}
+                      {!operationalExpenseCategories.length && (
+                        <p className="text-sm text-muted-foreground">
+                          No operational expense categories available.
+                        </p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1809,53 +1479,38 @@ const BusinessForecast = () => {
                   <CardContent>
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            <h5 className="font-semibold text-sm">
-                              Cost Growth Rate
-                            </h5>
-                            <div className="text-3xl font-bold text-orange-600">
-                              +4.2%
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              YoY increase from 2024 to 2025
-                            </p>
-                            <div className="border-t pt-2 mt-2">
+                        {costTrendAnalyses.map((trend, index) => (
+                          <Card key={trend.id} className="p-4">
+                            <div className="space-y-3">
+                              <h5 className="font-semibold text-sm">{trend.title}</h5>
+                              <div
+                                className={`text-3xl font-bold ${
+                                  index % 2 === 0 ? "text-orange-600" : "text-green-600"
+                                }`}
+                              >
+                                {trend.value}
+                              </div>
                               <p className="text-xs text-muted-foreground">
-                                Primary drivers:
+                                {trend.description}
                               </p>
-                              <ul className="text-xs space-y-1 mt-1">
-                                <li>• Salary increases (+2%)</li>
-                                <li>• Material cost inflation (+3%)</li>
-                                <li>• Headcount expansion (+1.2%)</li>
-                              </ul>
+                              <div className="border-t pt-2 mt-2">
+                                <p className="text-xs text-muted-foreground">
+                                  {trend.benchmark}
+                                </p>
+                                <ul className="text-xs space-y-1 mt-1">
+                                  {trend.bulletPoints.map((point) => (
+                                    <li key={point}>• {point}</li>
+                                  ))}
+                                </ul>
+                              </div>
                             </div>
-                          </div>
-                        </Card>
-
-                        <Card className="p-4">
-                          <div className="space-y-3">
-                            <h5 className="font-semibold text-sm">
-                              COGS as % of Revenue
-                            </h5>
-                            <div className="text-3xl font-bold text-green-600">
-                              37%
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Below industry average of 42%
-                            </p>
-                            <div className="border-t pt-2 mt-2">
-                              <p className="text-xs text-muted-foreground">
-                                Cost efficiency opportunity:
-                              </p>
-                              <ul className="text-xs space-y-1 mt-1">
-                                <li>• Potential 1-2% improvement</li>
-                                <li>• Supplier optimization needed</li>
-                                <li>• Process automation benefits</li>
-                              </ul>
-                            </div>
-                          </div>
-                        </Card>
+                          </Card>
+                        ))}
+                        {!costTrendAnalyses.length && (
+                          <p className="text-sm text-muted-foreground">
+                            No cost trend analyses available.
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1952,26 +1607,17 @@ const BusinessForecast = () => {
                       <div className="space-y-3">
                         <h4 className="font-semibold text-sm">Key Risks</h4>
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between p-2 border rounded">
-                            <span className="text-sm">Market Competition</span>
-                            <Badge variant="destructive" className="text-xs">
-                              High
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between p-2 border rounded">
-                            <span className="text-sm">
-                              Supply Chain Disruption
-                            </span>
-                            <Badge className="text-xs bg-economic-warning text-economic-warning-foreground">
-                              Medium
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between p-2 border rounded">
-                            <span className="text-sm">Regulatory Changes</span>
-                            <Badge variant="secondary" className="text-xs">
-                              Low
-                            </Badge>
-                          </div>
+                          {keyRisks.map((risk, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 border rounded">
+                              <span className="text-sm">{risk.label}</span>
+                              <Badge
+                                variant={risk.level === 'high' ? 'destructive' : risk.level === 'low' ? 'secondary' : 'default'}
+                                className={`text-xs ${risk.level === 'medium' ? 'bg-economic-warning text-economic-warning-foreground' : ''}`}
+                              >
+                                {risk.level.charAt(0).toUpperCase() + risk.level.slice(1)}
+                              </Badge>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -1980,7 +1626,7 @@ const BusinessForecast = () => {
                           Key Assumptions
                         </h4>
                         <div className="space-y-2 text-sm text-muted-foreground">
-                          {KEY_ASSUMPTIONS.map((assumption, idx) => (
+                          {keyAssumptions.map((assumption, idx) => (
                             <p key={idx}>
                               • {assumption.label}: {assumption.value}
                             </p>
@@ -2023,7 +1669,7 @@ const BusinessForecast = () => {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {COMPETITIVE_METRICS.map((metric, idx) => (
+                        {competitiveMetrics.map((metric, idx) => (
                           <Card key={idx} className="p-4">
                             <div className="space-y-2">
                               <h4 className="font-medium text-sm">
@@ -2057,6 +1703,12 @@ const BusinessForecast = () => {
                     </div>
                   </CardContent>
                 </Card>
+              </section>
+            </TabsContent>
+
+            <TabsContent value="pricing" className="space-y-8">
+              <section>
+                <PricingStrategies />
               </section>
             </TabsContent>
 
