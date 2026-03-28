@@ -1,0 +1,19 @@
+# Python deps for agent/document_processing (INGEST → EXTRACT → NORMALIZE → METADATA → STORAGE → TRIGGER)
+# Install: pip install -r agent/document_processing/requirements-pipeline.txt
+#
+# Root requirements.txt already includes Pillow for Django; duplicate here is optional.
+
+# Vector store (optional — pipeline uses in-memory stub if import fails)
+chromadb>=0.4.22
+
+# Extraction stack (lazy-imported in extract.py — add packages for formats you need)
+chardet>=5.0
+pdfplumber>=0.10
+PyPDF2>=3.0
+python-docx>=1.0
+openpyxl>=3.1
+python-pptx>=0.6
+pytesseract>=0.3
+beautifulsoup4>=4.12
+lxml>=4.9
+pyyaml>=6.0
