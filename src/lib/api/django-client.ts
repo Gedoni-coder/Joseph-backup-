@@ -46,13 +46,37 @@ export async function djangoRequest<T>(
 
   try {
     const response = await fetch(url, config);
+    const rawBody = await response.text();
+    let parsedBody: unknown = null;
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `HTTP error! status: ${response.status}`);
+    if (rawBody) {
+      try {
+        parsedBody = JSON.parse(rawBody);
+      } catch {
+        parsedBody = rawBody;
+      }
     }
 
-    return await response.json();
+    if (!response.ok) {
+      const errorMessage =
+        (typeof parsedBody === "object" && parsedBody && "detail" in parsedBody && typeof parsedBody.detail === "string"
+          ? parsedBody.detail
+          : "") ||
+        (typeof parsedBody === "object" && parsedBody && "message" in parsedBody && typeof parsedBody.message === "string"
+          ? parsedBody.message
+          : "") ||
+        (typeof parsedBody === "object" && parsedBody
+          ? Object.entries(parsedBody)
+              .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : String(value)}`)
+              .join(" | ")
+          : typeof parsedBody === "string"
+            ? parsedBody
+            : "") ||
+        `HTTP error! status: ${response.status}`;
+      throw new Error(errorMessage);
+    }
+
+    return (parsedBody ?? undefined) as T;
   } catch (error) {
     console.error(`[Django API] Error making ${method} request to ${endpoint}:`, error);
     throw error;

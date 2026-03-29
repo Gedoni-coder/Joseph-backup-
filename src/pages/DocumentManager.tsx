@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   deleteDocumentRecord,
   listDocuments,
+  reprocessDocumentRecord,
   type DocumentRecord,
   updateDocumentMetadata,
   updateDocumentStatus,
@@ -24,7 +25,6 @@ import {
   Download,
   Eye,
   Trash2,
-  Share,
   Star,
   Clock,
   User,
@@ -39,7 +39,6 @@ import {
   Archive,
   Mail,
   RefreshCw,
-  X,
 } from "lucide-react";
 
 interface ManagerDocument {
@@ -119,10 +118,22 @@ function normalizeStatus(value?: string): "Processing" | "Processed" | "Failed" 
 
 function mapRecord(record: DocumentRecord): ManagerDocument {
   const metadata = (record.metadata || {}) as Record<string, unknown>;
-  const tags = Array.isArray(metadata.tags) ? (metadata.tags as string[]) : [];
-  const category = typeof metadata.category === "string" && metadata.category.trim()
-    ? metadata.category
+  const tags = Array.isArray(record.tags)
+    ? record.tags
+    : Array.isArray(metadata.tags)
+      ? (metadata.tags as string[])
+      : [];
+  const category = typeof record.category === "string" && record.category.trim()
+    ? record.category
+    : typeof metadata.category === "string" && metadata.category.trim()
+      ? metadata.category
     : "General";
+  const summary = typeof metadata.summary === "string" && metadata.summary.trim()
+    ? metadata.summary
+    : `${category} document uploaded via Document Upload Center`;
+  const documentType = typeof metadata.document_type === "string"
+    ? metadata.document_type
+    : record.file_type || "other";
 
   return {
     id: record.id,
@@ -134,9 +145,9 @@ function mapRecord(record: DocumentRecord): ManagerDocument {
     tags,
     starred: Boolean(metadata.starred),
     pinned: Boolean(metadata.pinned),
-    status: normalizeStatus(record.status),
+    status: normalizeStatus(record.status || (typeof metadata.status === "string" ? metadata.status : undefined)),
     category,
-    description: `${category} document uploaded via Document Upload Center`,
+    description: `${documentType.replace(/_/g, " ")}: ${summary}`,
     fileUrl: record.file_url || record.file,
     metadata,
   };
@@ -286,6 +297,17 @@ const DocumentManager: React.FC = () => {
     }
   };
 
+  const reprocessDoc = async (id: number) => {
+    try {
+      const response = await reprocessDocumentRecord(id);
+      setDocuments((prev) => prev.map((d) => (d.id === id ? mapRecord(response.document) : d)));
+      toast.success("Document reprocessed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to reprocess document.";
+      toast.error(message);
+    }
+  };
+
   const openPreview = (doc: ManagerDocument) => {
     if (!doc.fileUrl) {
       toast.error("No preview URL available for this document.");
@@ -364,8 +386,8 @@ const DocumentManager: React.FC = () => {
             <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => downloadFile(doc)}>
               <Download className="h-3 w-3" />
             </Button>
-            <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => void setDocumentState(doc.id, "Processed")}>
-              <CheckCircle className="h-3 w-3" />
+            <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => void reprocessDoc(doc.id)} title="Reprocess">
+              <RefreshCw className="h-3 w-3" />
             </Button>
             <Button
               size="sm"
@@ -415,7 +437,7 @@ const DocumentManager: React.FC = () => {
                 <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => downloadFile(doc)}>
                   <Download className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => void setDocumentState(doc.id, "Processing")}>
+                <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => void reprocessDoc(doc.id)} title="Reprocess">
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
                 <Button
@@ -537,7 +559,7 @@ const DocumentManager: React.FC = () => {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search documents, tags…"
+              placeholder="Search documents, tags..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-9"

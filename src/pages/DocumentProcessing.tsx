@@ -9,11 +9,13 @@ import {
   getDocumentInsights,
   listAllDocumentEvents,
   listDocuments,
+  reprocessDocumentRecord,
   type DocumentInsightRecord,
   type DocumentProcessingEvent,
   type DocumentRecord,
 } from "@/lib/api/document-upload-service";
-import { Activity, ArrowLeft, CheckCircle, Clock, File, XCircle } from "lucide-react";
+import { Activity, ArrowLeft, CheckCircle, Clock, File, RefreshCw, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const LEVEL_STYLES: Record<string, string> = {
   info: "bg-blue-100 text-blue-800",
@@ -42,7 +44,9 @@ const DocumentProcessing: React.FC = () => {
       setEvents(eventRows);
 
       const insightResults = await Promise.all(
-        docs.map(async (doc) => {
+        docs
+          .filter((doc) => doc.status === "Processed")
+          .map(async (doc) => {
           try {
             const insight = await getDocumentInsights(doc.id);
             return [doc.id, insight] as const;
@@ -58,8 +62,22 @@ const DocumentProcessing: React.FC = () => {
         }
       });
       setInsightsByDoc(nextInsights);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to refresh document pipeline data.";
+      toast.error(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReprocess = async (id: number) => {
+    try {
+      await reprocessDocumentRecord(id);
+      toast.success("Document reprocessed");
+      await refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to reprocess document.";
+      toast.error(message);
     }
   };
 
@@ -136,9 +154,14 @@ const DocumentProcessing: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-xs">{doc.file_type}</Badge>
                         <Badge className={STATUS_STYLES[doc.status || "Processing"]}>{doc.status || "Processing"}</Badge>
+                        {doc.category && <Badge variant="outline" className="text-xs">{doc.category}</Badge>}
                         {doc.status === "Processed" && <CheckCircle className="h-4 w-4 text-emerald-600" />}
                         {doc.status === "Failed" && <XCircle className="h-4 w-4 text-red-600" />}
                         {doc.status === "Processing" && <Clock className="h-4 w-4 text-amber-600" />}
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => void handleReprocess(doc.id)}>
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Reprocess
+                        </Button>
                       </div>
                     </div>
 

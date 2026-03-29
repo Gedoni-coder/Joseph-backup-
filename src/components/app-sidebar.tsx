@@ -27,6 +27,7 @@ import {
   FolderOpen,
   Lightbulb,
   ClipboardList,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -129,6 +130,7 @@ const solutionGroups: NavGroup[] = [
       { title: "AI Insights", url: "/ai-insights", icon: Brain },
       { title: "Document Manager", url: "/document-manager", icon: FolderOpen },
       { title: "Document Upload", url: "/document-upload", icon: Upload },
+      { title: "Document Processing", url: "/document-processing", icon: Activity },
       { title: "All Reports", url: "/all-reports", icon: FileText },
       { title: "Audit Reports", url: "/audit-reports", icon: ClipboardList },
       { title: "Risk Management", url: "/risk-management", icon: AlertTriangle },

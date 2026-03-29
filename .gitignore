@@ -1,3 +1,15 @@
+# Secrets — never commit
+.env
+backend/.env
+
+# Django user uploads / local dev files
+media/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
 # Logs
 logs
 *.log

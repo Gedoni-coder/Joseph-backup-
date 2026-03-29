@@ -251,7 +251,11 @@ def process_document(
         )
 
     file_id = ingest_result.file_id
-    file_bytes = open(ingest_result.temp_path, "rb").read() if ingest_result.temp_path else b""
+    if ingest_result.temp_path:
+        with open(ingest_result.temp_path, "rb") as temp_file:
+            file_bytes = temp_file.read()
+    else:
+        file_bytes = b""
 
     # ── Stage 2: EXTRACT ─────────────────────────────────────────────
     extract_sr = _run_stage(

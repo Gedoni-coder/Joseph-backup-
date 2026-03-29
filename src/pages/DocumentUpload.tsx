@@ -12,6 +12,7 @@ import {
   deleteDocumentRecord,
   listAllDocumentEvents,
   listDocuments,
+  reprocessDocumentRecord,
   type DocumentProcessingEvent,
   type DocumentRecord,
   uploadDocumentRecord,
@@ -38,6 +39,7 @@ import {
   FileCode,
   Archive,
   Mail,
+  RefreshCw,
 } from "lucide-react";
 
 interface UploadFile {
@@ -127,9 +129,14 @@ function mapRecordToFile(record: DocumentRecord): ProcessedFile {
     size: formatBytes(Number(record.size || 0)),
     uploadDate: new Date(record.uploaded_at).toISOString().split("T")[0],
     uploadedBy: record.uploaded_by_name || "You",
-    status: metadata.status || "Processed",
-    category: metadata.category || "General",
-    tags: Array.isArray(metadata.tags) && metadata.tags.length > 0 ? metadata.tags : [ext],
+    status: record.status || metadata.status || "Processed",
+    category: record.category || metadata.category || "General",
+    tags:
+      Array.isArray(record.tags) && record.tags.length > 0
+        ? record.tags
+        : Array.isArray(metadata.tags) && metadata.tags.length > 0
+          ? metadata.tags
+          : [ext],
     fileUrl: record.file_url || record.file,
   };
 }
@@ -239,7 +246,7 @@ const DocumentUpload: React.FC = () => {
           );
           setProcessedFiles((prev) => [mapRecordToFile(created), ...prev]);
           void refreshDocuments();
-          toast.success(`Uploaded ${item.name}. Backend processing started.`);
+          toast.success(`Uploaded ${item.name}. Document processing completed.`);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Upload failed.";
           setUploadQueue((prev) =>
@@ -306,6 +313,19 @@ const DocumentUpload: React.FC = () => {
     }
   };
 
+  const reprocessDocument = async (id: number) => {
+    try {
+      const response = await reprocessDocumentRecord(id);
+      const updated = mapRecordToFile(response.document);
+      setProcessedFiles((prev) => prev.map((file) => (file.id === id ? updated : file)));
+      void refreshDocuments();
+      toast.success("Document reprocessed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to reprocess document.";
+      toast.error(message);
+    }
+  };
+
   const openPreview = (file: ProcessedFile) => {
     if (!file.fileUrl) {
       toast.error("No preview URL available for this file.");
@@ -326,6 +346,8 @@ const DocumentUpload: React.FC = () => {
     a.click();
     document.body.removeChild(a);
   };
+
+  const recentEvents = processingEvents.slice(0, 12);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -480,6 +502,9 @@ const DocumentUpload: React.FC = () => {
                           <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => downloadFile(file)}>
                             <Download className="h-3 w-3 mr-1" />Download
                           </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => void reprocessDocument(file.id)}>
+                            <RefreshCw className="h-3 w-3 mr-1" />Reprocess
+                          </Button>
                           <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10" onClick={() => void removeProcessed(file.id)}>
                             <Trash2 className="h-3 w-3 mr-1" />Delete
                           </Button>
@@ -551,7 +576,7 @@ const DocumentUpload: React.FC = () => {
                 </CardContent>
               </Card>
             ) : (
-              processingEvents.map((event) => (
+              recentEvents.map((event) => (
                 <Card key={event.id} className="border-border/50">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">

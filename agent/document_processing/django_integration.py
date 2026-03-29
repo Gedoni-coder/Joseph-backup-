@@ -66,9 +66,17 @@ def process_stored_document(document, user_id: Optional[str] = None) -> Dict:
     metadata_update = {
         **current_metadata,
         "status": "Processed",
+        "document_type": metadata_result.document_type if metadata_result else "general",
         "category": current_metadata.get("category")
         or (metadata_result.category.title() if metadata_result else "General"),
+        "subcategory": metadata_result.subcategory if metadata_result else "miscellaneous",
         "tags": merged_tags,
+        "summary": metadata_result.summary if metadata_result else mvp_insights["summary"],
+        "keywords": keywords,
+        "classification_confidence": (
+            metadata_result.classification_confidence if metadata_result else 0.0
+        ),
+        "processing_flags": metadata_result.processing_flags if metadata_result else [],
         "pipeline": {
             "version": pipeline_result.pipeline_version,
             "duration_ms": pipeline_result.total_duration_ms,

@@ -6,11 +6,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# Project root (directory containing manage.py). Django reads env from here — not
+# backend/.env (that file is for the Node/Express server under backend/).
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-in-production')

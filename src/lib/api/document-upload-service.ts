@@ -22,6 +22,26 @@ export interface DocumentRecord {
   tags?: string[];
 }
 
+function getDocumentMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.detail === "string" && record.detail.trim()) {
+    return record.detail;
+  }
+  if (typeof record.message === "string" && record.message.trim()) {
+    return record.message;
+  }
+
+  const fieldErrors = Object.entries(record)
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(", ") : String(value)}`)
+    .join(" | ");
+
+  return fieldErrors || fallback;
+}
+
 export interface DocumentProcessingEvent {
   id: number;
   document: number;
@@ -102,6 +122,15 @@ export async function updateDocumentStatus(
   });
 }
 
+export async function reprocessDocumentRecord(
+  id: number,
+): Promise<{ document: DocumentRecord }> {
+  return djangoPost<{ document: DocumentRecord }>(
+    `/api/business/documents/${id}/reprocess/`,
+    {},
+  );
+}
+
 export async function listDocumentEvents(id: number): Promise<DocumentProcessingEvent[]> {
   return djangoGet<DocumentProcessingEvent[]>(`/api/business/documents/${id}/events/`);
 }
@@ -178,10 +207,8 @@ export async function uploadDocumentRecord(
 
       let message = `Upload failed with status ${xhr.status}`;
       try {
-        const body = JSON.parse(xhr.responseText) as { detail?: string };
-        if (body.detail) {
-          message = body.detail;
-        }
+        const body = JSON.parse(xhr.responseText) as unknown;
+        message = getDocumentMessage(body, message);
       } catch {
         // Keep default message.
       }

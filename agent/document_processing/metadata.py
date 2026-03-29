@@ -136,6 +136,40 @@ DOC_TYPE_TAXONOMY = {
     },
 }
 
+FILE_FORMAT_HINTS = frozenset({
+    "pdf",
+    "doc",
+    "docx",
+    "odt",
+    "xlsx",
+    "xls",
+    "ods",
+    "csv",
+    "tsv",
+    "ppt",
+    "pptx",
+    "json",
+    "jsonl",
+    "html",
+    "xml",
+    "yaml",
+    "yml",
+    "text",
+    "txt",
+    "markdown",
+    "rst",
+    "log",
+    "email",
+    "image",
+    "archive",
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "sql",
+    "unknown",
+})
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -292,6 +326,20 @@ def _classify_document(text: str, filename: str) -> ClassificationResult:
     )
 
 
+def _resolve_document_type(document_type_hint: str, classification: ClassificationResult) -> str:
+    """
+    Prefer semantic document hints and ignore raw file-format hints.
+    """
+    hint = (document_type_hint or "").strip().lower()
+    if not hint:
+        return classification.document_type
+    if hint in FILE_FORMAT_HINTS:
+        return classification.document_type
+    if hint in DOC_TYPE_TAXONOMY:
+        return hint
+    return classification.document_type
+
+
 # ---------------------------------------------------------------------------
 # Summary generation
 # ---------------------------------------------------------------------------
@@ -396,7 +444,7 @@ def generate_metadata(
     flags: List[str] = []
 
     classification = _classify_document(clean_text, filename)
-    doc_type = document_type_hint or classification.document_type
+    doc_type = _resolve_document_type(document_type_hint, classification)
 
     keywords = _extract_keywords(clean_text)
     topics = _extract_bigrams(clean_text)
