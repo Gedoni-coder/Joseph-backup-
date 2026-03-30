@@ -23,8 +23,12 @@ export default function LearnCourseGenerate() {
     async function generateCourse() {
       setLoading(true);
       try {
-        const backendBase = import.meta.env.VITE_CHATBOT_BACKEND_URL || "http://localhost:8000";
-          const response = await fetch(`${backendBase}/chatbot/generate-response/`, {
+        const backendBase = (import.meta.env.VITE_CHATBOT_BACKEND_URL as string | undefined)?.trim() || "";
+        const courseUrl =
+          backendBase && /^https?:\/\//i.test(backendBase)
+            ? `${backendBase.replace(/\/$/, "")}/chatbot/generate-response/`
+            : "/chatbot/generate-response/";
+        const response = await fetch(courseUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

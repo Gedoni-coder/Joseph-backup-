@@ -15,7 +15,7 @@ class DocumentProcessingToolTests(APITestCase):
         result = process_text_document(
             (
                 "Invoice Number: INV-1001\n"
-                "Date: 2026-03-25\n"
+                "Date: March 30, 2026\n"
                 "Total Amount Due: $4,250.00\n"
                 "Remit To: Acme Supply LLC\n"
             ),
@@ -28,6 +28,7 @@ class DocumentProcessingToolTests(APITestCase):
         self.assertEqual(result.structured_output["document"]["document_type"], "invoice")
         self.assertEqual(result.structured_output["document"]["category"], "financial")
         self.assertIn("USD 4,250.00", result.structured_output["document"]["summary"])
+        self.assertNotIn("USD 2,026", result.structured_output["document"]["summary"])
 
     def test_process_text_document_skips_llm_without_key(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": ""}, clear=False):

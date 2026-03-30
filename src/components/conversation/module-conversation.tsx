@@ -60,12 +60,13 @@ export function ModuleConversation({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const backendBase = (import.meta as any).env?.VITE_CHATBOT_BACKEND_URL as string | undefined;
+  const backendBase = ((import.meta as any).env?.VITE_CHATBOT_BACKEND_URL as string | undefined)?.trim() || "";
 
   const apiUrl = (path: string) => {
-    const base = (backendBase || 'http://localhost:8000').trim();
-    if (base && /^https?:\/\//i.test(base)) return `${base.replace(/\/$/, '')}${path}`;
-    return path; // fallback to relative (same-origin when served by Django)
+    if (backendBase && /^https?:\/\//i.test(backendBase)) {
+      return `${backendBase.replace(/\/$/, "")}${path}`;
+    }
+    return path;
   };
 
   const backendModule =

@@ -94,6 +94,15 @@ _CURRENCY_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_MONETARY_CONTEXT_PATTERN = re.compile(
+    r"\b("
+    r"amount|balance|bill|budget|charge|charges|cost|due|expense|expenses|"
+    r"fee|fees|line item|paid|payment|payments|price|pricing|rate|"
+    r"remit|revenue|salary|subtotal|total|unit price"
+    r")\b",
+    re.IGNORECASE,
+)
+
 _PHONE_PATTERN = re.compile(
     r"(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"
 )
@@ -203,6 +212,7 @@ def _extract_dates(text: str) -> List[str]:
 
 def _extract_monetary(text: str) -> List[Dict]:
     results = []
+    multiplier_map = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000, "T": 1_000_000_000_000}
     for m in _CURRENCY_PATTERN.finditer(text):
         symbol = m.group("symbol") or ""
         amount_str = m.group("amount") or ""
@@ -213,14 +223,37 @@ def _extract_monetary(text: str) -> List[Dict]:
             amount = float(amount_str.replace(",", ""))
         except ValueError:
             continue
-        # Multiplier suffixes
-        multiplier_map = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000, "T": 1_000_000_000_000}
-        if code_suffix.upper() in multiplier_map:
-            amount *= multiplier_map[code_suffix.upper()]
+
+        code_upper = code_suffix.upper()
+        has_multiplier_suffix = code_upper in multiplier_map
+        has_explicit_currency = bool(symbol or (code_upper and not has_multiplier_suffix))
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        line_end = text.find("\n", m.end())
+        if line_end == -1:
+            line_end = len(text)
+        line_context = text[line_start:line_end]
+        has_monetary_context = bool(_MONETARY_CONTEXT_PATTERN.search(line_context))
+
+        if not has_explicit_currency and not has_multiplier_suffix and not has_monetary_context:
+            continue
+
+        if (
+            not has_explicit_currency
+            and not has_multiplier_suffix
+            and re.fullmatch(r"\d{4}", amount_str)
+            and 1900 <= amount <= 2100
+        ):
+            continue
+
+        if not has_explicit_currency and not has_multiplier_suffix and amount < 100:
+            continue
+
+        if has_multiplier_suffix:
+            amount *= multiplier_map[code_upper]
             code_suffix = ""
         currency = (
             _CURRENCY_SYMBOL_MAP.get(symbol, "")
-            or code_suffix.upper()
+            or code_upper
             or symbol.upper()
             or "USD"
         )
